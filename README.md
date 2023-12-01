@@ -1,11 +1,9 @@
 # Content
-+ [Profiles service](#images-storage-service)
 + [Configuration](#configuration)
 + [Metrics](#metrics)
 + [Docs](#docs)
-
-# Profiles service
- coming soon
++ [Author](#author)
++ [License](#license)
 
 # Configuration
 
@@ -22,3 +20,12 @@ The service uses Prometheus and Jaeger and supports distribution tracing
 [Swagger docs](swagger/docs/profiles_service_v1.swagger.json)
  
 
+# Author
+
+- [@Falokut](https://github.com/Falokut) - Primary author of the project
+
+# License
+
+This project is licensed under the terms of the [MIT License](https://opensource.org/licenses/MIT).
+
+---

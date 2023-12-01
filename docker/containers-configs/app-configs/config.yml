@@ -1,0 +1,44 @@
+log_level: "debug" # supported levels: "panic", "fatal", "error", "warning" or "warn", "info", "debug", "trace"
+healthcheck_port: 7001
+
+listen:
+  host: 0.0.0.0
+  port: 8080
+  server_mode: "BOTH"
+  allowed_headers:
+    - X-Account-Id
+  
+db_config: 
+  host: "profiles_db"
+  port: "5432"
+  username: "profiles_service"
+  db_name: "profiles_db"
+  ssl_mode: "disable"
+
+jaeger:
+  service_name: "Profiles_Service"
+  address: jaeger:6831
+  log_spans: true
+
+prometheus:
+  service_name: "Profiles_Service"
+  server_config:
+    host: 0.0.0.0
+    port: 7000
+
+image_storage_service:
+  storage_addr: "gateway:82"
+  base_profile_picture_url: "http://localhost:80/image"
+  profile_picture_category: "profiles-pictures"
+
+
+image_processing_service:
+  addr: "gateway:82"
+  max_image_width: 800
+  max_image_height: 800
+  min_image_width: 200
+  min_image_height: 200
+  profile_picture_width: 400
+  profile_picture_height: 400
+  image_resize_method: Linear
+  allowed_types: ["image/png", "image/jpeg"]

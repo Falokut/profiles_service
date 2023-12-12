@@ -5,22 +5,24 @@ import (
 	"net/url"
 	"runtime"
 
-	"github.com/Falokut/grpc_errors"
 	image_processing_service "github.com/Falokut/online_cinema_ticket_office/profiles_service/pkg/image_processing_service/v1/protos"
 	image_storage_service "github.com/Falokut/online_cinema_ticket_office/profiles_service/pkg/images_storage_service/v1/protos"
 	"github.com/opentracing/opentracing-go"
+	"github.com/opentracing/opentracing-go/ext"
 	"github.com/sirupsen/logrus"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 type ImagesService interface {
-	GetProfilePictureUrl(ctx context.Context, PictureID string) string
+	GetProfilePictureUrl(ctx context.Context, pictureID string) string
 	ResizeImage(ctx context.Context, image []byte) ([]byte, error)
 	UploadImage(ctx context.Context, image []byte) (string, error)
-	DeleteImage(ctx context.Context, PictureID string) error
-	ReplaceImage(ctx context.Context, image []byte, PictureID string, createIfNotExist bool) (string, error)
+	DeleteImage(ctx context.Context, pictureID string) error
+	ReplaceImage(ctx context.Context, image []byte, pictureID string, createIfNotExist bool) (string, error)
 }
 
-type ImageServiceConfig struct {
+type ImagesServiceConfig struct {
 	ImageWidth        int32
 	ImageHeight       int32
 	ImageResizeMethod image_processing_service.ResampleFilter
@@ -35,19 +37,19 @@ type ImageServiceConfig struct {
 	MinImageHeight int32
 }
 
-type imageService struct {
-	cfg                    ImageServiceConfig
+type imagesService struct {
+	cfg                    ImagesServiceConfig
 	logger                 *logrus.Logger
 	imageStorageService    image_storage_service.ImagesStorageServiceV1Client
 	imageProcessingService image_processing_service.ImageProcessingServiceV1Client
 	errorHandler           errorHandler
 }
 
-func NewImageService(cfg ImageServiceConfig, logger *logrus.Logger,
+func NewImagesService(cfg ImagesServiceConfig, logger *logrus.Logger,
 	imageStorageService image_storage_service.ImagesStorageServiceV1Client,
-	imageProcessingService image_processing_service.ImageProcessingServiceV1Client) *imageService {
+	imageProcessingService image_processing_service.ImageProcessingServiceV1Client) *imagesService {
 	errorHandler := newErrorHandler(logger)
-	return &imageService{
+	return &imagesService{
 		cfg:                    cfg,
 		logger:                 logger,
 		imageStorageService:    imageStorageService,
@@ -58,8 +60,8 @@ func NewImageService(cfg ImageServiceConfig, logger *logrus.Logger,
 
 // Returns profile picture url for GET request, or
 // returns empty string if there are error or picture unreachable
-func (s *imageService) GetProfilePictureUrl(ctx context.Context, PictureID string) string {
-	if PictureID == "" {
+func (s *imagesService) GetProfilePictureUrl(ctx context.Context, pictureID string) string {
+	if pictureID == "" {
 		return ""
 	}
 
@@ -72,7 +74,7 @@ func (s *imageService) GetProfilePictureUrl(ctx context.Context, PictureID strin
 	res, err := s.imageStorageService.IsImageExist(ctx,
 		&image_storage_service.ImageRequest{
 			Category: s.cfg.ProfilePictureCategory,
-			ImageId:  PictureID})
+			ImageId:  pictureID})
 	if err != nil {
 		s.logger.Error(err)
 		return ""
@@ -82,19 +84,17 @@ func (s *imageService) GetProfilePictureUrl(ctx context.Context, PictureID strin
 	}
 
 	q := u.Query()
-	q.Add("image_id", PictureID)
+	q.Add("image_id", pictureID)
 	q.Add("category", s.cfg.ProfilePictureCategory)
 	u.RawQuery = q.Encode()
 	return u.String()
 }
 
 // returns error if image not valid
-func (s *imageService) checkImage(ctx context.Context, image []byte) error {
+func (s *imagesService) checkImage(ctx context.Context, image []byte) error {
 	span, ctx := opentracing.StartSpanFromContext(ctx,
 		"ImagesService.checkImage")
 	defer span.Finish()
-	var err error
-	defer span.SetTag("grpc.status", grpc_errors.GetGrpcCode(err))
 
 	img := &image_processing_service.Image{Image: image}
 	res, err := s.imageProcessingService.Validate(ctx, &image_processing_service.ValidateRequest{
@@ -105,24 +105,19 @@ func (s *imageService) checkImage(ctx context.Context, image []byte) error {
 		MinHeight:      &s.cfg.MinImageHeight,
 		MinWidth:       &s.cfg.MinImageWidth,
 	})
-
-	if err != nil {
-		err = s.errorHandler.createExtendedErrorResponce(ErrInvalidImage, err.Error(), res.GetDetails())
-		return err
-	}
-	if !res.ImageValid {
-		err = s.errorHandler.createExtendedErrorResponce(ErrInvalidImage, "", res.GetDetails())
-		return err
+	if status.Code(err) == codes.Internal {
+		return s.errorHandler.createErrorResponceWithSpan(span, ErrInternal, err.Error())
+	} else if res != nil && !res.ImageValid || status.Code(err) == codes.InvalidArgument {
+		return s.errorHandler.createExtendedErrorResponceWithSpan(span, ErrInvalidImage, "", res.GetDetails())
 	}
 
+	span.SetTag("grpc.status", codes.OK)
 	return nil
 }
-func (s *imageService) ResizeImage(ctx context.Context, image []byte) ([]byte, error) {
+func (s *imagesService) ResizeImage(ctx context.Context, image []byte) ([]byte, error) {
 	span, ctx := opentracing.StartSpanFromContext(ctx,
-		"ImagesService.ResizeImage")
+		"imagesService.ResizeImage")
 	defer span.Finish()
-	var err error
-	defer span.SetTag("grpc.status", grpc_errors.GetGrpcCode(err))
 
 	resized, err := s.imageProcessingService.Resize(ctx, &image_processing_service.ResizeRequest{
 		Image:          &image_processing_service.Image{Image: image},
@@ -132,31 +127,35 @@ func (s *imageService) ResizeImage(ctx context.Context, image []byte) ([]byte, e
 	})
 
 	if err != nil {
-		err = s.errorHandler.createErrorResponce(ErrInternal, err.Error())
+		span.SetTag("grpc.status", status.Code(err))
+		ext.LogError(span, err)
 		return []byte{}, err
 	}
 	if resized == nil {
-		err = s.errorHandler.createErrorResponce(ErrInternal, "can't resize image")
-		return []byte{}, err
+		return []byte{}, s.errorHandler.createErrorResponceWithSpan(span, ErrInternal, "can't resize image")
 	}
 
+	span.SetTag("grpc.status", codes.OK)
 	return resized.Data, nil
 }
 
-func (s *imageService) UploadImage(ctx context.Context, image []byte) (string, error) {
+func (s *imagesService) UploadImage(ctx context.Context, image []byte) (string, error) {
 	span, ctx := opentracing.StartSpanFromContext(ctx,
-		"ImagesService.UploadImage")
+		"imagesService.UploadImage")
 	defer span.Finish()
-	var err error
-	defer span.SetTag("grpc.status", grpc_errors.GetGrpcCode(err))
 
-	if err = s.checkImage(ctx, image); err != nil {
+	if err := s.checkImage(ctx, image); err != nil {
+		span.SetTag("grpc.status", status.Code(err))
+		ext.LogError(span, err)
 		return "", err
 	}
+
 	imageSizeWithoutResize := len(image)
 	s.logger.Info("Resizing image")
-	image, err = s.ResizeImage(ctx, image)
+	image, err := s.ResizeImage(ctx, image)
 	if err != nil {
+		span.SetTag("grpc.status", status.Code(err))
+		ext.LogError(span, err)
 		return "", err
 	}
 
@@ -165,8 +164,7 @@ func (s *imageService) UploadImage(ctx context.Context, image []byte) (string, e
 	s.logger.Info("Creating stream")
 	stream, err := s.imageStorageService.StreamingUploadImage(ctx)
 	if err != nil {
-		err = s.errorHandler.createErrorResponce(ErrInternal, err.Error())
-		return "", err
+		return "", s.errorHandler.createErrorResponceWithSpan(span, ErrInternal, err.Error())
 	}
 
 	chunkSize := (len(image) + runtime.NumCPU() - 1) / runtime.NumCPU()
@@ -184,55 +182,56 @@ func (s *imageService) UploadImage(ctx context.Context, image []byte) (string, e
 			Data:     chunk,
 		})
 		if err != nil {
-			err = s.errorHandler.createErrorResponce(ErrInternal, err.Error()+"error while sending streaming message")
-			return "", err
+			return "", s.errorHandler.createErrorResponceWithSpan(span, ErrInternal, err.Error()+"error while sending streaming message")
 		}
 	}
 
 	s.logger.Info("Closing stream")
 	res, err := stream.CloseAndRecv()
 	if err != nil {
-		err = s.errorHandler.createErrorResponce(ErrInternal, err.Error()+"error while sending close")
-		return "", err
+		return "", s.errorHandler.createErrorResponceWithSpan(span, ErrInternal, err.Error()+"error while sending close")
 	}
+
+	span.SetTag("grpc.status", codes.OK)
 	return res.ImageId, nil
 }
 
-func (s *imageService) DeleteImage(ctx context.Context, PictureID string) error {
+func (s *imagesService) DeleteImage(ctx context.Context, pictureID string) error {
 	span, ctx := opentracing.StartSpanFromContext(ctx,
-		"ImagesService.UploadImage")
+		"imagesService.DeleteImage")
 	defer span.Finish()
-	var err error
-	defer span.SetTag("grpc.status", grpc_errors.GetGrpcCode(err))
 
-	s.logger.Debugf("Deleting image with %s id", PictureID)
-	_, err = s.imageStorageService.DeleteImage(ctx, &image_storage_service.ImageRequest{
+	s.logger.Debugf("Deleting image with %s id", pictureID)
+	_, err := s.imageStorageService.DeleteImage(ctx, &image_storage_service.ImageRequest{
 		Category: s.cfg.ProfilePictureCategory,
-		ImageId:  PictureID,
+		ImageId:  pictureID,
 	})
 	if err != nil {
-		err = s.errorHandler.createErrorResponce(ErrInternal, err.Error())
-		return err
+		return s.errorHandler.createErrorResponceWithSpan(span, err, "")
 	}
+
+	span.SetTag("grpc.status", codes.OK)
 	return nil
 }
 
-func (s *imageService) ReplaceImage(ctx context.Context, image []byte,
-	PictureID string, createIfNotExist bool) (string, error) {
+func (s *imagesService) ReplaceImage(ctx context.Context, image []byte,
+	pictureID string, createIfNotExist bool) (string, error) {
 	span, ctx := opentracing.StartSpanFromContext(ctx,
-		"ImagesService.ReplaceImage")
+		"imagesService.ReplaceImage")
 	defer span.Finish()
-	var err error
-	defer span.SetTag("grpc.status", grpc_errors.GetGrpcCode(err))
 
-	if err = s.checkImage(ctx, image); err != nil {
+	if err := s.checkImage(ctx, image); err != nil {
+		span.SetTag("grpc.status", status.Code(err))
+		ext.LogError(span, err)
 		return "", err
 	}
 
 	uncompressedSize := len(image)
-	s.logger.Info("Compressing image")
-	image, err = s.ResizeImage(ctx, image)
+	s.logger.Info("Resizing image")
+	image, err := s.ResizeImage(ctx, image)
 	if err != nil {
+		span.SetTag("grpc.status", status.Code(err))
+		ext.LogError(span, err)
 		return "", err
 	}
 	s.logger.Debugf("image size before resizing: %d resized: %d", uncompressedSize, len(image))
@@ -240,13 +239,15 @@ func (s *imageService) ReplaceImage(ctx context.Context, image []byte,
 	resp, err := s.imageStorageService.ReplaceImage(ctx,
 		&image_storage_service.ReplaceImageRequest{
 			Category:         s.cfg.ProfilePictureCategory,
-			ImageId:          PictureID,
+			ImageId:          pictureID,
 			ImageData:        image,
 			CreateIfNotExist: createIfNotExist,
 		})
+
 	if err != nil {
-		err = s.errorHandler.createErrorResponce(ErrInternal, err.Error())
-		return "", err
+		return "", s.errorHandler.createErrorResponceWithSpan(span, err, "")
 	}
+
+	span.SetTag("grpc.status", codes.OK)
 	return resp.ImageId, nil
 }

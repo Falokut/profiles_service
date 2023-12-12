@@ -66,7 +66,7 @@ func main() {
 	}
 
 	logger.Info("Repository initializing")
-	repo := repository.NewProfileRepository(database)
+	repo := repository.NewProfilesRepository(database)
 	defer repo.Shutdown()
 
 	logger.Info("GRPC Client initializing")
@@ -93,11 +93,11 @@ func main() {
 		}
 	}()
 
-	imagesService := service.NewImageService(getImageServiceConfig(appCfg),
+	imagesService := service.NewImagesService(getImageServiceConfig(appCfg),
 		logger.Logger, imageStorageService, imageProcessingService)
 
 	logger.Info("Service initializing")
-	service := service.NewProfilesService(repo, logger.Logger, metric, imagesService)
+	service := service.NewProfilesService(repo, logger.Logger, imagesService)
 
 	logger.Info("Server initializing")
 	s := server.NewServer(logger.Logger, service)
@@ -127,8 +127,8 @@ func getImageProcessingServiceConnection(cfg *config.Config) (*grpc.ClientConn, 
 			otgrpc.OpenTracingStreamClientInterceptor(opentracing.GlobalTracer())),
 	)
 }
-func getImageServiceConfig(cfg *config.Config) service.ImageServiceConfig {
-	return service.ImageServiceConfig{
+func getImageServiceConfig(cfg *config.Config) service.ImagesServiceConfig {
+	return service.ImagesServiceConfig{
 		ImageWidth:             cfg.ImageProcessingService.ProfilePictureWidth,
 		ImageHeight:            cfg.ImageProcessingService.ProfilePictureHeight,
 		ImageResizeMethod:      ConvertResizeType(cfg.ImageProcessingService.ImageResizeMethod),
@@ -160,9 +160,9 @@ func getListenServerConfig(cfg *config.Config) server.Config {
 	}
 }
 
-func ConvertResizeType(Type string) image_processing_service.ResampleFilter {
-	Type = strings.ToTitle(Type)
-	switch Type {
+func ConvertResizeType(resizeType string) image_processing_service.ResampleFilter {
+	resizeType = strings.ToTitle(resizeType)
+	switch resizeType {
 	case "Box":
 		return image_processing_service.ResampleFilter_Box
 	case "CatmullRom":

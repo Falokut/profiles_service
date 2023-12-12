@@ -4,14 +4,15 @@ import (
 	"context"
 	"errors"
 
-	"github.com/Falokut/grpc_errors"
 	"github.com/Falokut/online_cinema_ticket_office/profiles_service/internal/model"
 	"github.com/Falokut/online_cinema_ticket_office/profiles_service/internal/repository"
-	"github.com/Falokut/online_cinema_ticket_office/profiles_service/pkg/metrics"
 	profiles_service "github.com/Falokut/online_cinema_ticket_office/profiles_service/pkg/profiles_service/v1/protos"
 	"github.com/opentracing/opentracing-go"
+	"github.com/opentracing/opentracing-go/ext"
 	"github.com/sirupsen/logrus"
+	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/metadata"
+	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/emptypb"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
@@ -20,18 +21,16 @@ type ProfilesService struct {
 	profiles_service.UnimplementedProfilesServiceV1Server
 	repo          repository.ProfileRepository
 	logger        *logrus.Logger
-	metrics       metrics.Metrics
 	errorHandler  errorHandler
 	imagesService ImagesService
 }
 
 func NewProfilesService(repo repository.ProfileRepository,
-	logger *logrus.Logger, metrics metrics.Metrics, imagesService ImagesService) *ProfilesService {
+	logger *logrus.Logger, imagesService ImagesService) *ProfilesService {
 	errorHandler := newErrorHandler(logger)
 	return &ProfilesService{repo: repo,
 		logger:        logger,
 		errorHandler:  errorHandler,
-		metrics:       metrics,
 		imagesService: imagesService,
 	}
 }
@@ -40,45 +39,45 @@ func (s *ProfilesService) GetUserProfile(ctx context.Context,
 	in *emptypb.Empty) (*profiles_service.GetUserProfileResponce, error) {
 	span, ctx := opentracing.StartSpanFromContext(ctx, "ProfilesService.GetUserProfile")
 	defer span.Finish()
-	var err error
-	defer span.SetTag("grpc.status", grpc_errors.GetGrpcCode(err))
 
 	accountID, err := s.getAccountId(ctx)
 	if err != nil {
+		span.SetTag("grpc.status", status.Code(err))
+		ext.LogError(span, err)
 		return nil, err
 	}
 
 	Profile, err := s.repo.GetUserProfile(ctx, accountID)
 	if errors.Is(err, repository.ErrProfileNotFound) {
-		err = s.errorHandler.createExtendedErrorResponce(ErrProfileNotFound, "", ErrProfileNotFound.Error())
-		return nil, err
+		return nil, s.errorHandler.createExtendedErrorResponceWithSpan(span, ErrProfileNotFound, "", ErrProfileNotFound.Error())
 	}
 	if err != nil {
-		err = s.errorHandler.createExtendedErrorResponce(ErrInternal, err.Error(), "")
-		return nil, err
+		return nil, s.errorHandler.createExtendedErrorResponceWithSpan(span, ErrInternal, err.Error(), "")
 	}
 
+	span.SetTag("grpc.status", codes.OK)
 	return s.convertUserProfileProtoFromModel(ctx, Profile), nil
 }
 
 func (s *ProfilesService) UpdateProfilePicture(ctx context.Context,
 	in *profiles_service.UpdateProfilePictureRequest) (*emptypb.Empty, error) {
-
 	span, ctx := opentracing.StartSpanFromContext(ctx,
 		"ProfilesService.UpdateProfilePicture")
 	defer span.Finish()
-	var err error
-	defer span.SetTag("grpc.status", grpc_errors.GetGrpcCode(err))
 
 	s.logger.Info("Getting account id from context")
 	accountID, err := s.getAccountId(ctx)
 	if err != nil {
+		span.SetTag("grpc.status", status.Code(err))
+		ext.LogError(span, err)
 		return nil, err
 	}
 
 	s.logger.Info("Getting current picture id")
 	CurrentPictureID, err := s.getCurrentProfileID(ctx, accountID)
 	if err != nil {
+		span.SetTag("grpc.status", status.Code(err))
+		ext.LogError(span, err)
 		return nil, err
 	}
 
@@ -92,6 +91,8 @@ func (s *ProfilesService) UpdateProfilePicture(ctx context.Context,
 	}
 
 	if err != nil {
+		span.SetTag("grpc.status", status.Code(err))
+		ext.LogError(span, err)
 		return nil, err
 	}
 
@@ -99,64 +100,64 @@ func (s *ProfilesService) UpdateProfilePicture(ctx context.Context,
 		s.logger.Info("Updating PictureID")
 		err = s.repo.UpdateProfilePictureID(ctx, accountID, PictureID)
 		if err != nil {
-			return nil, s.errorHandler.createExtendedErrorResponce(ErrInternal, err.Error(), "error while updating picture")
+			return nil, s.errorHandler.createExtendedErrorResponceWithSpan(span,
+				ErrInternal, err.Error(), "error while updating picture")
 		}
 	}
 
+	span.SetTag("grpc.status", codes.OK)
 	return &emptypb.Empty{}, nil
 }
 
 func (s *ProfilesService) GetEmail(ctx context.Context, in *emptypb.Empty) (*profiles_service.GetEmailResponce, error) {
 	span, ctx := opentracing.StartSpanFromContext(ctx, "ProfilesService.GetEmail")
 	defer span.Finish()
-	var err error
-	defer span.SetTag("grpc.status", grpc_errors.GetGrpcCode(err))
 
 	accountID, err := s.getAccountId(ctx)
 	if err != nil {
+		span.SetTag("grpc.status", status.Code(err))
+		ext.LogError(span, err)
 		return nil, err
 	}
 
 	email, err := s.repo.GetEmail(ctx, accountID)
 	if err != nil {
-		err = s.errorHandler.createErrorResponce(ErrInternal, err.Error())
-		return nil, err
+		return nil, s.errorHandler.createErrorResponceWithSpan(span, ErrInternal, err.Error())
 	}
 	if len(email) < 1 {
-		err = s.errorHandler.createErrorResponce(ErrInternal, "")
-		return nil, err
+		return nil, s.errorHandler.createErrorResponceWithSpan(span, ErrInternal, "")
 	}
 
+	span.SetTag("grpc.status", codes.OK)
 	return &profiles_service.GetEmailResponce{Email: email}, nil
 }
 
 func (s *ProfilesService) CreateProfile(ctx context.Context, in *profiles_service.CreateProfileRequest) (*emptypb.Empty, error) {
 	span, ctx := opentracing.StartSpanFromContext(ctx, "ProfilesService.CreateProfile")
 	defer span.Finish()
-	var err error
-	defer span.SetTag("grpc.status", grpc_errors.GetGrpcCode(err))
 
-	err = s.repo.CreateUserProfile(ctx, convertUserProfileModelFromProto(in))
-	if err != nil {
-		return nil, s.errorHandler.createErrorResponce(ErrInternal, err.Error())
+	if err := s.repo.CreateUserProfile(ctx, convertUserProfileModelFromProto(in)); err != nil {
+		return nil, s.errorHandler.createErrorResponceWithSpan(span, ErrInternal, err.Error())
 	}
+
+	span.SetTag("grpc.status", codes.OK)
 	return &emptypb.Empty{}, nil
 }
+
 func (s *ProfilesService) DeleteProfile(ctx context.Context, in *profiles_service.DeleteProfileRequest) (*emptypb.Empty, error) {
 	span, ctx := opentracing.StartSpanFromContext(ctx, "ProfilesService.DeleteProfile")
 	defer span.Finish()
-	var err error
-	defer span.SetTag("grpc.status", grpc_errors.GetGrpcCode(err))
-	err = s.repo.DeleteUserProfile(ctx, in.AccountID)
+
+	err := s.repo.DeleteUserProfile(ctx, in.AccountID)
 	if errors.Is(err, repository.ErrProfileNotFound) {
-		err = s.errorHandler.createExtendedErrorResponce(ErrProfileNotFound, "", ErrProfileNotFound.Error())
-		return nil, err
+		return nil, s.errorHandler.createExtendedErrorResponceWithSpan(span, ErrProfileNotFound,
+			"", ErrProfileNotFound.Error())
 	}
 	if err != nil {
-		err = s.errorHandler.createExtendedErrorResponce(ErrInternal, err.Error(), "")
-		return nil, err
+		return nil, s.errorHandler.createExtendedErrorResponceWithSpan(span, ErrInternal, err.Error(), "")
 	}
 
+	span.SetTag("grpc.status", codes.OK)
 	return &emptypb.Empty{}, nil
 }
 
@@ -182,17 +183,19 @@ func (s *ProfilesService) DeleteProfilePicture(ctx context.Context, in *emptypb.
 	span, ctx := opentracing.StartSpanFromContext(ctx,
 		"ProfilesService.DeleteProfilePicture")
 	defer span.Finish()
-	var err error
-	defer span.SetTag("grpc.status", grpc_errors.GetGrpcCode(err))
 
 	s.logger.Info("Getting account id from context")
 	accountID, err := s.getAccountId(ctx)
 	if err != nil {
+		span.SetTag("grpc.status", status.Code(err))
+		ext.LogError(span, err)
 		return nil, err
 	}
 
 	CurrentPictureID, err := s.getCurrentProfileID(ctx, accountID)
 	if err != nil {
+		span.SetTag("grpc.status", status.Code(err))
+		ext.LogError(span, err)
 		return nil, err
 	}
 
@@ -202,14 +205,17 @@ func (s *ProfilesService) DeleteProfilePicture(ctx context.Context, in *emptypb.
 
 	err = s.imagesService.DeleteImage(ctx, CurrentPictureID)
 	if err != nil {
+		span.SetTag("grpc.status", status.Code(err))
+		ext.LogError(span, err)
 		return nil, err
 	}
 
 	err = s.repo.UpdateProfilePictureID(ctx, accountID, "")
 	if err != nil {
-		return nil, s.errorHandler.createErrorResponce(ErrCantUpdateProfilePicture, err.Error())
+		return nil, s.errorHandler.createErrorResponceWithSpan(span, ErrCantUpdateProfilePicture, err.Error())
 	}
 
+	span.SetTag("grpc.status", codes.OK)
 	return &emptypb.Empty{}, nil
 }
 

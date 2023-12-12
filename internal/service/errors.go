@@ -6,6 +6,8 @@ import (
 
 	"github.com/Falokut/grpc_errors"
 	profiles_service "github.com/Falokut/online_cinema_ticket_office/profiles_service/pkg/profiles_service/v1/protos"
+	"github.com/opentracing/opentracing-go"
+	"github.com/opentracing/opentracing-go/ext"
 	"github.com/sirupsen/logrus"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -39,6 +41,16 @@ func newErrorHandler(logger *logrus.Logger) errorHandler {
 	}
 }
 
+func (e *errorHandler) createErrorResponceWithSpan(span opentracing.Span, err error, developerMessage string) error {
+	if err == nil {
+		return nil
+	}
+
+	span.SetTag("grpc.status", grpc_errors.GetGrpcCode(err))
+	ext.LogError(span, err)
+	return e.createErrorResponce(err, developerMessage)
+}
+
 func (e *errorHandler) createErrorResponce(err error, developerMessage string) error {
 	var msg string
 	if len(developerMessage) == 0 {
@@ -52,17 +64,28 @@ func (e *errorHandler) createErrorResponce(err error, developerMessage string) e
 	return err
 }
 
-func (e *errorHandler) createExtendedErrorResponce(err error, DeveloperMessage, UserMessage string) error {
+func (e *errorHandler) createExtendedErrorResponceWithSpan(span opentracing.Span,
+	err error, developerMessage, userMessage string) error {
+	if err == nil {
+		return nil
+	}
+
+	span.SetTag("grpc.status", grpc_errors.GetGrpcCode(err))
+	ext.LogError(span, err)
+	return e.createExtendedErrorResponce(err, developerMessage, userMessage)
+}
+
+func (e *errorHandler) createExtendedErrorResponce(err error, developerMessage, userMessage string) error {
 	var msg string
-	if DeveloperMessage == "" {
+	if developerMessage == "" {
 		msg = err.Error()
 	} else {
-		msg = fmt.Sprintf("%s. error: %v", DeveloperMessage, err)
+		msg = fmt.Sprintf("%s. error: %v", developerMessage, err)
 	}
 
 	extErr := status.New(grpc_errors.GetGrpcCode(err), msg)
-	if len(UserMessage) > 0 {
-		extErr, _ = extErr.WithDetails(&profiles_service.UserErrorMessage{Message: UserMessage})
+	if len(userMessage) > 0 {
+		extErr, _ = extErr.WithDetails(&profiles_service.UserErrorMessage{Message: userMessage})
 		if extErr == nil {
 			e.logger.Error(err)
 			return err

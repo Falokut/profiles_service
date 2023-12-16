@@ -105,10 +105,19 @@ func (s *imagesService) checkImage(ctx context.Context, image []byte) error {
 		MinHeight:      &s.cfg.MinImageHeight,
 		MinWidth:       &s.cfg.MinImageWidth,
 	})
-	if status.Code(err) == codes.Internal {
-		return s.errorHandler.createErrorResponceWithSpan(span, ErrInternal, err.Error())
-	} else if res != nil && !res.ImageValid || status.Code(err) == codes.InvalidArgument {
-		return s.errorHandler.createExtendedErrorResponceWithSpan(span, ErrInvalidImage, "", res.GetDetails())
+	if status.Code(err) == codes.InvalidArgument {
+		var msg string
+		if res != nil {
+			msg = res.GetDetails()
+		}
+		return s.errorHandler.createExtendedErrorResponceWithSpan(span, ErrInvalidImage, "", msg)
+	} else if err != nil {
+		var msg string
+		if res != nil {
+			msg = res.GetDetails()
+		}
+		return s.errorHandler.createExtendedErrorResponceWithSpan(span, err, "", msg)
+
 	}
 
 	span.SetTag("grpc.status", codes.OK)

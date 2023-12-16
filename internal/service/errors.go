@@ -5,7 +5,7 @@ import (
 	"fmt"
 
 	"github.com/Falokut/grpc_errors"
-	profiles_service "github.com/Falokut/online_cinema_ticket_office/profiles_service/pkg/profiles_service/v1/protos"
+	profiles_service "github.com/Falokut/profiles_service/pkg/profiles_service/v1/protos"
 	"github.com/opentracing/opentracing-go"
 	"github.com/opentracing/opentracing-go/ext"
 	"github.com/sirupsen/logrus"

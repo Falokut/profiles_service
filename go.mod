@@ -1,10 +1,12 @@
-module github.com/Falokut/online_cinema_ticket_office/profiles_service
+module github.com/Falokut/profiles_service
 
 go 1.21.4
 
 require (
 	github.com/Falokut/grpc_errors v1.0.0
 	github.com/Falokut/healthcheck v0.0.0-20231124155013-bff54f9bc002
+	github.com/Falokut/image_processing_service v0.0.0-20231216141247-314ff5a1c5fe
+	github.com/Falokut/images_storage_service v0.0.0-20231216134112-b416da66f6f6
 	github.com/grpc-ecosystem/grpc-gateway/v2 v2.18.1
 	github.com/ilyakaznacheev/cleanenv v1.5.0
 	github.com/jackc/pgx/v5 v5.5.1
@@ -20,6 +22,7 @@ require (
 
 require (
 	github.com/jackc/puddle/v2 v2.2.1 // indirect
+	github.com/kr/text v0.2.0 // indirect
 	golang.org/x/sync v0.4.0 // indirect
 )
 
@@ -39,7 +42,6 @@ require (
 
 require (
 	github.com/BurntSushi/toml v1.2.1 // indirect
-	github.com/HdrHistogram/hdrhistogram-go v1.1.2 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/cespare/xxhash/v2 v2.2.0 // indirect
 	github.com/felixge/httpsnoop v1.0.4 // indirect

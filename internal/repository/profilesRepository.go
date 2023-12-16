@@ -6,7 +6,7 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/Falokut/online_cinema_ticket_office/profiles_service/internal/model"
+	"github.com/Falokut/profiles_service/internal/model"
 	_ "github.com/jackc/pgx/v5/stdlib"
 	"github.com/jmoiron/sqlx"
 	"github.com/opentracing/opentracing-go"

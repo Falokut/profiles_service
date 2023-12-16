@@ -5,8 +5,8 @@ import (
 	"net/url"
 	"runtime"
 
-	image_processing_service "github.com/Falokut/online_cinema_ticket_office/profiles_service/pkg/image_processing_service/v1/protos"
-	image_storage_service "github.com/Falokut/online_cinema_ticket_office/profiles_service/pkg/images_storage_service/v1/protos"
+	image_processing_service "github.com/Falokut/image_processing_service/pkg/image_processing_service/v1/protos"
+	image_storage_service "github.com/Falokut/images_storage_service/pkg/images_storage_service/v1/protos"
 	"github.com/opentracing/opentracing-go"
 	"github.com/opentracing/opentracing-go/ext"
 	"github.com/sirupsen/logrus"

@@ -5,7 +5,7 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/Falokut/online_cinema_ticket_office/profiles_service/internal/model"
+	"github.com/Falokut/profiles_service/internal/model"
 	"github.com/jmoiron/sqlx"
 )
 

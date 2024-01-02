@@ -70,19 +70,21 @@ func main() {
 	defer repo.Shutdown()
 
 	logger.Info("GRPC Client initializing")
-	conn, err := getImageStorageConnection(appCfg)
+	imageStorageConn, err := getGrpcConn(appCfg.ImageStorageService.StorageAddr)
 	if err != nil {
 		logger.Fatal(err)
 	}
+	defer imageStorageConn.Close()
 
-	imageStorageService := image_storage_service.NewImagesStorageServiceV1Client(conn)
+	imageStorageService := image_storage_service.NewImagesStorageServiceV1Client(imageStorageConn)
 
-	conn, err = getImageProcessingServiceConnection(appCfg)
+	imageProcessingConn, err := getGrpcConn(appCfg.ImageProcessingService.Addr)
 	if err != nil {
 		logger.Fatal(err)
 	}
+	defer imageProcessingConn.Close()
 
-	imageProcessingService := image_processing_service.NewImageProcessingServiceV1Client(conn)
+	imageProcessingService := image_processing_service.NewImageProcessingServiceV1Client(imageProcessingConn)
 	logger.Info("Healthcheck initializing")
 	healthcheckManager := healthcheck.NewHealthManager(logger.Logger,
 		[]healthcheck.HealthcheckResource{database}, appCfg.HealthcheckPort, nil)
@@ -109,8 +111,9 @@ func main() {
 	<-quit
 	s.Shutdown()
 }
-func getImageStorageConnection(cfg *config.Config) (*grpc.ClientConn, error) {
-	return grpc.Dial(cfg.ImageStorageService.StorageAddr,
+
+func getGrpcConn(addr string) (*grpc.ClientConn, error) {
+	return grpc.Dial(addr,
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
 		grpc.WithUnaryInterceptor(
 			otgrpc.OpenTracingClientInterceptor(opentracing.GlobalTracer())),
@@ -118,15 +121,7 @@ func getImageStorageConnection(cfg *config.Config) (*grpc.ClientConn, error) {
 			otgrpc.OpenTracingStreamClientInterceptor(opentracing.GlobalTracer())),
 	)
 }
-func getImageProcessingServiceConnection(cfg *config.Config) (*grpc.ClientConn, error) {
-	return grpc.Dial(cfg.ImageProcessingService.Addr,
-		grpc.WithTransportCredentials(insecure.NewCredentials()),
-		grpc.WithUnaryInterceptor(
-			otgrpc.OpenTracingClientInterceptor(opentracing.GlobalTracer())),
-		grpc.WithStreamInterceptor(
-			otgrpc.OpenTracingStreamClientInterceptor(opentracing.GlobalTracer())),
-	)
-}
+
 func getImageServiceConfig(cfg *config.Config) service.ImagesServiceConfig {
 	return service.ImagesServiceConfig{
 		ImageWidth:             cfg.ImageProcessingService.ProfilePictureWidth,

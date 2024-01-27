@@ -2,7 +2,7 @@ package service
 
 import (
 	"context"
-	"net/url"
+	"fmt"
 	"runtime"
 
 	image_processing_service "github.com/Falokut/image_processing_service/pkg/image_processing_service/v1/protos"
@@ -65,12 +65,6 @@ func (s *imagesService) GetProfilePictureUrl(ctx context.Context, pictureID stri
 		return ""
 	}
 
-	u, err := url.Parse(s.cfg.BaseProfilePictureUrl)
-	if err != nil {
-		s.logger.Errorf("can't parse url. error: %s", err.Error())
-		return ""
-	}
-
 	res, err := s.imageStorageService.IsImageExist(ctx,
 		&image_storage_service.ImageRequest{
 			Category: s.cfg.ProfilePictureCategory,
@@ -83,11 +77,7 @@ func (s *imagesService) GetProfilePictureUrl(ctx context.Context, pictureID stri
 		return ""
 	}
 
-	q := u.Query()
-	q.Add("image_id", pictureID)
-	q.Add("category", s.cfg.ProfilePictureCategory)
-	u.RawQuery = q.Encode()
-	return u.String()
+	return fmt.Sprintf("%s/%s/%s", s.cfg.BaseProfilePictureUrl, s.cfg.ProfilePictureCategory, pictureID)
 }
 
 // returns error if image not valid

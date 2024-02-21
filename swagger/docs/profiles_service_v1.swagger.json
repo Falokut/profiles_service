@@ -15,7 +15,8 @@
     }
   ],
   "schemes": [
-    "http"
+    "http",
+    "https"
   ],
   "consumes": [
     "application/json"
@@ -24,53 +25,6 @@
     "application/json"
   ],
   "paths": {
-    "/v1/get-email": {
-      "delete": {
-        "operationId": "profilesServiceV1_GetEmail",
-        "responses": {
-          "200": {
-            "description": "A successful response.",
-            "schema": {
-              "$ref": "#/definitions/profiles_serviceGetEmailResponce"
-            }
-          },
-          "403": {
-            "description": "Returned when the user does not have permission to access the resource.",
-            "schema": {
-              "type": "string",
-              "format": "string"
-            }
-          },
-          "404": {
-            "description": "Returned when account with specified id not found",
-            "schema": {}
-          },
-          "500": {
-            "description": "Something went wrong.",
-            "schema": {
-              "$ref": "#/definitions/rpcStatus"
-            }
-          },
-          "default": {
-            "description": "An unexpected error response.",
-            "schema": {
-              "$ref": "#/definitions/rpcStatus"
-            }
-          }
-        },
-        "parameters": [
-          {
-            "name": "X-Account-Id",
-            "in": "header",
-            "required": true,
-            "type": "string"
-          }
-        ],
-        "tags": [
-          "profilesServiceV1"
-        ]
-      }
-    },
     "/v1/profile": {
       "get": {
         "operationId": "profilesServiceV1_GetUserProfile",
@@ -95,7 +49,7 @@
           "500": {
             "description": "Something went wrong.",
             "schema": {
-              "$ref": "#/definitions/rpcStatus"
+              "$ref": "#/definitions/googlerpcStatus"
             }
           },
           "default": {
@@ -118,7 +72,54 @@
         ]
       }
     },
-    "/v1/profile/delete-picture": {
+    "/v1/profile/email": {
+      "get": {
+        "operationId": "profilesServiceV1_GetEmail",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/profiles_serviceGetEmailResponce"
+            }
+          },
+          "403": {
+            "description": "Returned when the user does not have permission to access the resource.",
+            "schema": {
+              "type": "string",
+              "format": "string"
+            }
+          },
+          "404": {
+            "description": "Returned when account with specified id not found",
+            "schema": {}
+          },
+          "500": {
+            "description": "Something went wrong.",
+            "schema": {
+              "$ref": "#/definitions/googlerpcStatus"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "X-Account-Id",
+            "in": "header",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "tags": [
+          "profilesServiceV1"
+        ]
+      }
+    },
+    "/v1/profile/picture": {
       "delete": {
         "operationId": "profilesServiceV1_DeleteProfilePicture",
         "responses": {
@@ -143,7 +144,7 @@
           "500": {
             "description": "Something went wrong.",
             "schema": {
-              "$ref": "#/definitions/rpcStatus"
+              "$ref": "#/definitions/googlerpcStatus"
             }
           },
           "default": {
@@ -164,9 +165,7 @@
         "tags": [
           "profilesServiceV1"
         ]
-      }
-    },
-    "/v1/profile/update-picture": {
+      },
       "post": {
         "operationId": "profilesServiceV1_UpdateProfilePicture",
         "responses": {
@@ -191,7 +190,7 @@
           "500": {
             "description": "Something went wrong.",
             "schema": {
-              "$ref": "#/definitions/rpcStatus"
+              "$ref": "#/definitions/googlerpcStatus"
             }
           },
           "default": {

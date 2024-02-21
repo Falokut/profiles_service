@@ -10,7 +10,7 @@ import "google/protobuf/empty.proto";
 
 option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_swagger) = {
     schemes: HTTP;
-    // schemes: HTTPS;
+    schemes: HTTPS;
     consumes: "application/json";
     produces: "application/json";
 
@@ -45,7 +45,7 @@ option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_swagger) = {
             description: "Returned when the resource does not exist.";
             schema: {
                 json_schema: {
-                    ref: "#/definitions/rpcStatus";
+                    ref: "#/definitions/googlerpcStatus";
                 }
             }
         }
@@ -56,7 +56,7 @@ option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_swagger) = {
             description: "Something went wrong.";
             schema: {
                 json_schema: {
-                    ref: "#/definitions/rpcStatus";
+                    ref: "#/definitions/googlerpcStatus";
                 }
             }
         }
@@ -88,7 +88,7 @@ service profilesServiceV1 {
     };
     rpc UpdateProfilePicture(UpdateProfilePictureRequest) returns (google.protobuf.Empty) {
         option (google.api.http) = {
-            post: "/v1/profile/update-picture"
+            post: "/v1/profile/picture"
             body: "*"
         };
         option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
@@ -111,7 +111,7 @@ service profilesServiceV1 {
 
     rpc DeleteProfilePicture(google.protobuf.Empty) returns (google.protobuf.Empty) {
         option (google.api.http) = {
-            delete: "/v1/profile/delete-picture"
+            delete: "/v1/profile/picture"
         };
         option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
             responses: {
@@ -133,7 +133,7 @@ service profilesServiceV1 {
 
     rpc GetEmail(google.protobuf.Empty) returns (GetEmailResponce) {
         option (google.api.http) = {
-            delete: "/v1/get-email"
+            get: "/v1/profile/email"
         };
         option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
             responses: {

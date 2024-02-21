@@ -159,7 +159,7 @@ func RegisterProfilesServiceV1HandlerServer(ctx context.Context, mux *runtime.Se
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
 		var err error
 		var annotatedContext context.Context
-		annotatedContext, err = runtime.AnnotateIncomingContext(ctx, mux, req, "/profiles_service.ProfilesServiceV1/UpdateProfilePicture", runtime.WithHTTPPathPattern("/v1/profile/update-picture"))
+		annotatedContext, err = runtime.AnnotateIncomingContext(ctx, mux, req, "/profiles_service.ProfilesServiceV1/UpdateProfilePicture", runtime.WithHTTPPathPattern("/v1/profile/picture"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -184,7 +184,7 @@ func RegisterProfilesServiceV1HandlerServer(ctx context.Context, mux *runtime.Se
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
 		var err error
 		var annotatedContext context.Context
-		annotatedContext, err = runtime.AnnotateIncomingContext(ctx, mux, req, "/profiles_service.ProfilesServiceV1/DeleteProfilePicture", runtime.WithHTTPPathPattern("/v1/profile/delete-picture"))
+		annotatedContext, err = runtime.AnnotateIncomingContext(ctx, mux, req, "/profiles_service.ProfilesServiceV1/DeleteProfilePicture", runtime.WithHTTPPathPattern("/v1/profile/picture"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -201,7 +201,7 @@ func RegisterProfilesServiceV1HandlerServer(ctx context.Context, mux *runtime.Se
 
 	})
 
-	mux.Handle("DELETE", pattern_ProfilesServiceV1_GetEmail_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
+	mux.Handle("GET", pattern_ProfilesServiceV1_GetEmail_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
 		ctx, cancel := context.WithCancel(req.Context())
 		defer cancel()
 		var stream runtime.ServerTransportStream
@@ -209,7 +209,7 @@ func RegisterProfilesServiceV1HandlerServer(ctx context.Context, mux *runtime.Se
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
 		var err error
 		var annotatedContext context.Context
-		annotatedContext, err = runtime.AnnotateIncomingContext(ctx, mux, req, "/profiles_service.ProfilesServiceV1/GetEmail", runtime.WithHTTPPathPattern("/v1/get-email"))
+		annotatedContext, err = runtime.AnnotateIncomingContext(ctx, mux, req, "/profiles_service.ProfilesServiceV1/GetEmail", runtime.WithHTTPPathPattern("/v1/profile/email"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -295,7 +295,7 @@ func RegisterProfilesServiceV1HandlerClient(ctx context.Context, mux *runtime.Se
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
 		var err error
 		var annotatedContext context.Context
-		annotatedContext, err = runtime.AnnotateContext(ctx, mux, req, "/profiles_service.ProfilesServiceV1/UpdateProfilePicture", runtime.WithHTTPPathPattern("/v1/profile/update-picture"))
+		annotatedContext, err = runtime.AnnotateContext(ctx, mux, req, "/profiles_service.ProfilesServiceV1/UpdateProfilePicture", runtime.WithHTTPPathPattern("/v1/profile/picture"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -317,7 +317,7 @@ func RegisterProfilesServiceV1HandlerClient(ctx context.Context, mux *runtime.Se
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
 		var err error
 		var annotatedContext context.Context
-		annotatedContext, err = runtime.AnnotateContext(ctx, mux, req, "/profiles_service.ProfilesServiceV1/DeleteProfilePicture", runtime.WithHTTPPathPattern("/v1/profile/delete-picture"))
+		annotatedContext, err = runtime.AnnotateContext(ctx, mux, req, "/profiles_service.ProfilesServiceV1/DeleteProfilePicture", runtime.WithHTTPPathPattern("/v1/profile/picture"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -333,13 +333,13 @@ func RegisterProfilesServiceV1HandlerClient(ctx context.Context, mux *runtime.Se
 
 	})
 
-	mux.Handle("DELETE", pattern_ProfilesServiceV1_GetEmail_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
+	mux.Handle("GET", pattern_ProfilesServiceV1_GetEmail_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
 		ctx, cancel := context.WithCancel(req.Context())
 		defer cancel()
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
 		var err error
 		var annotatedContext context.Context
-		annotatedContext, err = runtime.AnnotateContext(ctx, mux, req, "/profiles_service.ProfilesServiceV1/GetEmail", runtime.WithHTTPPathPattern("/v1/get-email"))
+		annotatedContext, err = runtime.AnnotateContext(ctx, mux, req, "/profiles_service.ProfilesServiceV1/GetEmail", runtime.WithHTTPPathPattern("/v1/profile/email"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -361,11 +361,11 @@ func RegisterProfilesServiceV1HandlerClient(ctx context.Context, mux *runtime.Se
 var (
 	pattern_ProfilesServiceV1_GetUserProfile_0 = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1}, []string{"v1", "profile"}, ""))
 
-	pattern_ProfilesServiceV1_UpdateProfilePicture_0 = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2}, []string{"v1", "profile", "update-picture"}, ""))
+	pattern_ProfilesServiceV1_UpdateProfilePicture_0 = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2}, []string{"v1", "profile", "picture"}, ""))
 
-	pattern_ProfilesServiceV1_DeleteProfilePicture_0 = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2}, []string{"v1", "profile", "delete-picture"}, ""))
+	pattern_ProfilesServiceV1_DeleteProfilePicture_0 = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2}, []string{"v1", "profile", "picture"}, ""))
 
-	pattern_ProfilesServiceV1_GetEmail_0 = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1}, []string{"v1", "get-email"}, ""))
+	pattern_ProfilesServiceV1_GetEmail_0 = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2}, []string{"v1", "profile", "email"}, ""))
 )
 
 var (

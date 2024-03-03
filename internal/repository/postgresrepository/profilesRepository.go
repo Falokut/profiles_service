@@ -59,8 +59,8 @@ func (r *ProfilesRepository) UpdateProfilePictureId(ctx context.Context, account
 	return err
 }
 
-func (r *ProfilesRepository) GetProfilePictureID(ctx context.Context, accountId string) (pictureId string, err error) {
-	defer r.handleError(ctx, &err, "GetProfilePictureID")
+func (r *ProfilesRepository) GetProfilePictureId(ctx context.Context, accountId string) (pictureId string, err error) {
+	defer r.handleError(ctx, &err, "GetProfilePictureId")
 
 	query := fmt.Sprintf("SELECT COALESCE(profile_picture_id,'')  AS profile_picture_id FROM %s WHERE account_id=$1 LIMIT 1;",
 		profilesTableName)
@@ -89,12 +89,22 @@ func (r *ProfilesRepository) CreateProfile(ctx context.Context, profile models.P
 	return
 }
 
-func (r *ProfilesRepository) DeleteProfile(ctx context.Context, accountId string) (err error) {
+func (r *ProfilesRepository) DeleteProfile(ctx context.Context, accountId string) (restx repository.Transaction, err error) {
 	defer r.handleError(ctx, &err, "CreateProfile")
 
+	tx, err := r.db.BeginTx(ctx, &sql.TxOptions{})
+	if err != nil {
+		return
+	}
+
 	query := fmt.Sprintf("DELETE FROM %s WHERE account_id=$1", profilesTableName)
-	_, err = r.db.ExecContext(ctx, query, accountId)
-	return
+	_, err = tx.ExecContext(ctx, query, accountId)
+	if err != nil {
+		tx.Rollback()
+		return
+	}
+
+	return tx, nil
 }
 
 func (r *ProfilesRepository) handleError(ctx context.Context, err *error, functionName string) {

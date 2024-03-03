@@ -11,9 +11,10 @@ import (
 )
 
 type accountsEventsConsumer struct {
-	reader *kafka.Reader
-	logger *logrus.Logger
-	repo   ProfilesRepository
+	reader        *kafka.Reader
+	logger        *logrus.Logger
+	repo          ProfilesRepository
+	imagesService ImagesService
 }
 
 const (
@@ -21,7 +22,11 @@ const (
 	accountDeletedTopic = "account_deleted"
 )
 
-func NewAccountEventsConsumer(cfg KafkaReaderConfig, logger *logrus.Logger, repo ProfilesRepository) *accountsEventsConsumer {
+func NewAccountEventsConsumer(
+	cfg KafkaReaderConfig,
+	logger *logrus.Logger,
+	repo ProfilesRepository,
+	imagesService ImagesService) *accountsEventsConsumer {
 	r := kafka.NewReader(kafka.ReaderConfig{
 		Brokers:          cfg.Brokers,
 		GroupTopics:      []string{accountCreatedTopic, accountDeletedTopic},
@@ -31,9 +36,10 @@ func NewAccountEventsConsumer(cfg KafkaReaderConfig, logger *logrus.Logger, repo
 	})
 
 	return &accountsEventsConsumer{
-		reader: r,
-		logger: logger,
-		repo:   repo,
+		reader:        r,
+		logger:        logger,
+		repo:          repo,
+		imagesService: imagesService,
 	}
 }
 
@@ -72,7 +78,28 @@ func (e *accountsEventsConsumer) AccountDeleted(ctx context.Context, email, acco
 	defer e.handleError(ctx, &err)
 	defer e.logError(err, "AccountDeleted")
 
-	err = e.repo.DeleteProfile(ctx, accountId)
+	pictureId, err := e.repo.GetProfilePictureId(ctx, accountId)
+	if models.Code(err) == models.NotFound {
+		// account already deleted
+		return nil
+	}
+
+	if err != nil {
+		return
+	}
+
+	tx, err := e.repo.DeleteProfile(ctx, accountId)
+	if err != nil {
+		return
+	}
+
+	err = e.imagesService.DeleteImage(ctx, pictureId)
+	if err != nil {
+		tx.Rollback()
+		return
+	}
+
+	tx.Commit()
 	return
 }
 

@@ -73,19 +73,6 @@ func main() {
 	logger.Info("Repository initializing")
 	repo := postgresrepository.NewProfilesRepository(database, logger.Logger)
 
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	var wg sync.WaitGroup
-	wg.Add(1)
-	go func() {
-		logger.Info("Running movie event consumer")
-		movieEventsConsumer := events.NewAccountEventsConsumer(getKafkaReaderConfig(cfg.AccountEventsConfig),
-			logger.Logger, repo)
-		movieEventsConsumer.Run(ctx)
-		wg.Done()
-	}()
-
 	go func() {
 		logger.Info("Healthcheck initializing")
 		healthcheckManager := healthcheck.NewHealthManager(logger.Logger,
@@ -107,6 +94,19 @@ func main() {
 		return
 	}
 	defer imagesService.Shutdown()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	var wg sync.WaitGroup
+	wg.Add(1)
+	go func() {
+		logger.Info("Running account events consumer")
+		accountEventsConsumer := events.NewAccountEventsConsumer(getKafkaReaderConfig(cfg.AccountEventsConfig),
+			logger.Logger, repo, imagesService)
+		accountEventsConsumer.Run(ctx)
+		wg.Done()
+	}()
 
 	logger.Info("Service initializing")
 	service := service.NewProfilesService(repo, logger.Logger, imagesService)

@@ -6,12 +6,17 @@ import (
 	"github.com/Falokut/profiles_service/internal/models"
 )
 
+type Transaction interface {
+	Commit() error
+	Rollback() error
+}
+
 type ProfileRepository interface {
 	CreateProfile(ctx context.Context, profile models.Profile) error
-	DeleteProfile(ctx context.Context, accountId string) error
+	DeleteProfile(ctx context.Context, accountId string) (tx Transaction, err error)
 	// in
 	GetProfile(ctx context.Context, accountId string) (models.RepositoryProfile, error)
-	GetProfilePictureID(ctx context.Context, accountId string) (string, error)
+	GetProfilePictureId(ctx context.Context, accountId string) (string, error)
 	UpdateProfilePictureId(ctx context.Context, accountId string, pictureId string) error
 	GetEmail(ctx context.Context, accountId string) (string, error)
 }

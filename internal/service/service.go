@@ -58,7 +58,7 @@ func (s *profilesService) GetProfile(ctx context.Context,
 func (s *profilesService) UpdateProfilePicture(ctx context.Context,
 	accountId string, image []byte) (err error) {
 	s.logger.Info("Getting current picture id")
-	currentPictureID, err := s.repo.GetProfilePictureID(ctx, accountId)
+	currentPictureID, err := s.repo.GetProfilePictureId(ctx, accountId)
 	if err != nil {
 		return
 	}
@@ -93,7 +93,7 @@ func (s *profilesService) GetEmail(ctx context.Context, accountID string) (email
 }
 
 func (s *profilesService) DeleteProfilePicture(ctx context.Context, accountId string) (err error) {
-	currentPictureId, err := s.repo.GetProfilePictureID(ctx, accountId)
+	currentPictureId, err := s.repo.GetProfilePictureId(ctx, accountId)
 	if err != nil || currentPictureId == "" {
 		return
 	}

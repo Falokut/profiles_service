@@ -2,7 +2,7 @@ version: "3.8"
 
 include:
   - profiles_db/profiles_db.yml
-  #- kafka-cluster.yml
+  - kafka-cluster.yml
 
 networks:
   profiles_service_network:

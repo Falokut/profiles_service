@@ -64,7 +64,7 @@ option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_swagger) = {
 };
 
 service profilesServiceV1 {
-    rpc GetUserProfile(google.protobuf.Empty) returns (GetUserProfileResponce) {
+    rpc GetProfile(google.protobuf.Empty) returns (GetProfileResponse ) {
         option (google.api.http) = {
             get: "/v1/profile"
         };
@@ -86,6 +86,7 @@ service profilesServiceV1 {
             };
         };
     };
+
     rpc UpdateProfilePicture(UpdateProfilePictureRequest) returns (google.protobuf.Empty) {
         option (google.api.http) = {
             post: "/v1/profile/picture"
@@ -131,7 +132,7 @@ service profilesServiceV1 {
         };
     }
 
-    rpc GetEmail(google.protobuf.Empty) returns (GetEmailResponce) {
+    rpc GetEmail(google.protobuf.Empty) returns (GetEmailResponse ) {
         option (google.api.http) = {
             get: "/v1/profile/email"
         };
@@ -152,7 +153,4 @@ service profilesServiceV1 {
             };
         };
     }
-
-    rpc CreateProfile(CreateProfileRequest) returns (google.protobuf.Empty){}
-    rpc DeleteProfile(DeleteProfileRequest) returns (google.protobuf.Empty){}
 }

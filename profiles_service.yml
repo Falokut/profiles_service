@@ -2,6 +2,7 @@ version: "3.8"
 
 include:
   - profiles_db/profiles_db.yml
+  #- kafka-cluster.yml
 
 networks:
   profiles_service_network:
@@ -10,19 +11,23 @@ networks:
 
 services:
   profiles_service:
-    build: ./
+    build:
+      dockerfile: ./alpine.Dockerfile
     command: ./bin/app
     environment:
       DB_PASSWORD: ${DB_PASSWORD}
     volumes:
-      - ./docker/containers-configs/app-configs/config.yml:/configs/config.yml
-    # ports:
-    # - 8080
+      - ./docker/containers-configs/config.yml:/configs/config.yml
+    ports:
+      - 9080:8080
     networks:
       - profiles_service_network
       - profiles_db_network
+      - kafka_network
     depends_on:
-      profiles_db:
+      profiles_pool:
+        condition: service_started
+      kafka:
         condition: service_healthy
     healthcheck:
       test: wget --no-verbose --tries=1 --spider 'http://localhost:7001/healthcheck' || exit 1

@@ -27,12 +27,12 @@
   "paths": {
     "/v1/profile": {
       "get": {
-        "operationId": "profilesServiceV1_GetUserProfile",
+        "operationId": "profilesServiceV1_GetProfile",
         "responses": {
           "200": {
             "description": "A successful response.",
             "schema": {
-              "$ref": "#/definitions/profiles_serviceGetUserProfileResponce"
+              "$ref": "#/definitions/profiles_serviceGetProfileResponse"
             }
           },
           "403": {
@@ -79,7 +79,7 @@
           "200": {
             "description": "A successful response.",
             "schema": {
-              "$ref": "#/definitions/profiles_serviceGetEmailResponce"
+              "$ref": "#/definitions/profiles_serviceGetEmailResponse"
             }
           },
           "403": {
@@ -223,7 +223,7 @@
     }
   },
   "definitions": {
-    "profiles_serviceGetEmailResponce": {
+    "profiles_serviceGetEmailResponse": {
       "type": "object",
       "properties": {
         "email": {
@@ -231,7 +231,7 @@
         }
       }
     },
-    "profiles_serviceGetUserProfileResponce": {
+    "profiles_serviceGetProfileResponse": {
       "type": "object",
       "properties": {
         "username": {

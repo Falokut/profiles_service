@@ -5,135 +5,152 @@ import (
 	"errors"
 	"os"
 	"os/signal"
-	"strings"
+	"sync"
 	"syscall"
 
 	server "github.com/Falokut/grpc_rest_server"
 	"github.com/Falokut/healthcheck"
-	image_processing_service "github.com/Falokut/image_processing_service/pkg/image_processing_service/v1/protos"
-	image_storage_service "github.com/Falokut/images_storage_service/pkg/images_storage_service/v1/protos"
-	logging "github.com/Falokut/online_cinema_ticket_office.loggerwrapper"
 	"github.com/Falokut/profiles_service/internal/config"
-	"github.com/Falokut/profiles_service/internal/repository"
+	"github.com/Falokut/profiles_service/internal/events"
+	"github.com/Falokut/profiles_service/internal/handler"
+	"github.com/Falokut/profiles_service/internal/imagesservice"
+	"github.com/Falokut/profiles_service/internal/repository/postgresrepository"
 	"github.com/Falokut/profiles_service/internal/service"
 	jaegerTracer "github.com/Falokut/profiles_service/pkg/jaeger"
+	"github.com/Falokut/profiles_service/pkg/logging"
 	"github.com/Falokut/profiles_service/pkg/metrics"
 	profiles_service "github.com/Falokut/profiles_service/pkg/profiles_service/v1/protos"
 	"github.com/grpc-ecosystem/grpc-gateway/v2/runtime"
-	"github.com/grpc-ecosystem/grpc-opentracing/go/otgrpc"
 	"github.com/opentracing/opentracing-go"
 	"github.com/sirupsen/logrus"
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials/insecure"
 )
 
 func main() {
-	logging.NewEntry(logging.FileAndConsoleOutput)
+	logging.NewEntry(logging.ConsoleOutput)
 	logger := logging.GetLogger()
-	appCfg := config.GetConfig()
-	log_level, err := logrus.ParseLevel(appCfg.LogLevel)
+	cfg := config.GetConfig()
+
+	logLevel, err := logrus.ParseLevel(cfg.LogLevel)
 	if err != nil {
 		logger.Fatal(err)
 	}
-	logger.Logger.SetLevel(log_level)
+	logger.Logger.SetLevel(logLevel)
 
-	tracer, closer, err := jaegerTracer.InitJaeger(appCfg.JaegerConfig)
+	tracer, closer, err := jaegerTracer.InitJaeger(cfg.JaegerConfig)
 	if err != nil {
-		logger.Fatal("cannot create tracer", err)
+		logger.Errorf("Shutting down, error while creating tracer %v", err)
+		return
 	}
 	logger.Info("Jaeger connected")
 	defer closer.Close()
-
 	opentracing.SetGlobalTracer(tracer)
 
 	logger.Info("Metrics initializing")
-	metric, err := metrics.CreateMetrics(appCfg.PrometheusConfig.Name)
+	metric, err := metrics.CreateMetrics(cfg.PrometheusConfig.Name)
 	if err != nil {
-		logger.Fatal(err)
+		logger.Errorf("Shutting down, error while creating metrics %v", err)
+		return
 	}
 
+	shutdown := make(chan error, 1)
 	go func() {
 		logger.Info("Metrics server running")
-		if err := metrics.RunMetricServer(appCfg.PrometheusConfig.ServerConfig); err != nil {
-			logger.Fatal(err)
+		if err := metrics.RunMetricServer(cfg.PrometheusConfig.ServerConfig); err != nil {
+			logger.Errorf("Shutting down, error while running metrics server %v", err)
+			shutdown <- err
+			return
 		}
 	}()
 
 	logger.Info("Database initializing")
-	database, err := repository.NewPostgreDB(appCfg.DBConfig)
+	database, err := postgresrepository.NewPostgreDB(cfg.DBConfig)
 	if err != nil {
-		logger.Fatalf("Shutting down, connection to the database is not established: %s", err.Error())
+		logger.Errorf("Shutting down, connection to the database is not established: %s", err.Error())
+		return
 	}
+	defer database.Close()
 
 	logger.Info("Repository initializing")
-	repo := repository.NewProfilesRepository(database)
-	defer repo.Shutdown()
+	repo := postgresrepository.NewProfilesRepository(database, logger.Logger)
 
-	logger.Info("GRPC Client initializing")
-	imageStorageConn, err := getGrpcConn(appCfg.ImageStorageService.StorageAddr)
-	if err != nil {
-		logger.Fatal(err)
-	}
-	defer imageStorageConn.Close()
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 
-	imageStorageService := image_storage_service.NewImagesStorageServiceV1Client(imageStorageConn)
-
-	imageProcessingConn, err := getGrpcConn(appCfg.ImageProcessingService.Addr)
-	if err != nil {
-		logger.Fatal(err)
-	}
-	defer imageProcessingConn.Close()
-
-	imageProcessingService := image_processing_service.NewImageProcessingServiceV1Client(imageProcessingConn)
-	logger.Info("Healthcheck initializing")
-	healthcheckManager := healthcheck.NewHealthManager(logger.Logger,
-		[]healthcheck.HealthcheckResource{database}, appCfg.HealthcheckPort, nil)
+	var wg sync.WaitGroup
+	wg.Add(1)
 	go func() {
-		logger.Info("Healthcheck server running")
+		logger.Info("Running movie event consumer")
+		movieEventsConsumer := events.NewAccountEventsConsumer(getKafkaReaderConfig(cfg.AccountEventsConfig),
+			logger.Logger, repo)
+		movieEventsConsumer.Run(ctx)
+		wg.Done()
+	}()
+
+	go func() {
+		logger.Info("Healthcheck initializing")
+		healthcheckManager := healthcheck.NewHealthManager(logger.Logger,
+			[]healthcheck.HealthcheckResource{database}, cfg.HealthcheckPort, nil)
 		if err := healthcheckManager.RunHealthcheckEndpoint(); err != nil {
-			logger.Fatalf("Shutting down, can't run healthcheck endpoint %s", err.Error())
+			logger.Errorf("Shutting down, error while running healthcheck endpoint %s", err.Error())
+			shutdown <- err
+			return
 		}
 	}()
 
-	imagesService := service.NewImagesService(getImageServiceConfig(appCfg),
-		logger.Logger, imageStorageService, imageProcessingService)
+	imagesService, err := imagesservice.NewImagesService(getImageServiceConfig(cfg),
+		logger.Logger, cfg.ImageStorageService.Addr,
+		cfg.ImageStorageService.SecureConfig,
+		cfg.ImageProcessingService.Addr,
+		cfg.ImageProcessingService.SecureConfig)
+	if err != nil {
+		logger.Errorf("Shutting down, error while creating images service %s", err.Error())
+		return
+	}
+	defer imagesService.Shutdown()
 
 	logger.Info("Service initializing")
 	service := service.NewProfilesService(repo, logger.Logger, imagesService)
 
+	handler := handler.NewProfilesServiceHandler(service)
+
 	logger.Info("Server initializing")
-	s := server.NewServer(logger.Logger, service)
-	s.Run(getListenServerConfig(appCfg), metric, nil, nil)
+	s := server.NewServer(logger.Logger, handler)
+	go func() {
+		if err := s.Run(getListenServerConfig(cfg), metric, nil, nil); err != nil {
+			logger.Errorf("Shutting down, error while running server %s", err.Error())
+			shutdown <- err
+			return
+		}
+	}()
 
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGHUP, syscall.SIGTERM)
 
-	<-quit
+	select {
+	case <-quit:
+		break
+	case <-shutdown:
+		break
+	}
+
 	s.Shutdown()
+	cancel()
+	wg.Wait()
 }
 
-func getGrpcConn(addr string) (*grpc.ClientConn, error) {
-	return grpc.Dial(addr,
-		grpc.WithTransportCredentials(insecure.NewCredentials()),
-		grpc.WithUnaryInterceptor(
-			otgrpc.OpenTracingClientInterceptor(opentracing.GlobalTracer())),
-		grpc.WithStreamInterceptor(
-			otgrpc.OpenTracingStreamClientInterceptor(opentracing.GlobalTracer())),
-	)
-}
-
-func getImageServiceConfig(cfg *config.Config) service.ImagesServiceConfig {
-	return service.ImagesServiceConfig{
-		ImageWidth:             cfg.ImageProcessingService.ProfilePictureWidth,
-		ImageHeight:            cfg.ImageProcessingService.ProfilePictureHeight,
-		ImageResizeMethod:      ConvertResizeType(cfg.ImageProcessingService.ImageResizeMethod),
-		BaseProfilePictureUrl:  cfg.ImageStorageService.BaseProfilePictureUrl,
-		ProfilePictureCategory: cfg.ImageStorageService.ProfilePictureCategory,
-		AllowedTypes:           cfg.ImageProcessingService.AllowedTypes,
-		MaxImageWidth:          cfg.ImageProcessingService.MaxImageWidth,
-		MaxImageHeight:         cfg.ImageProcessingService.MaxImageHeight,
-		MinImageWidth:          cfg.ImageProcessingService.MinImageWidth,
-		MinImageHeight:         cfg.ImageProcessingService.MinImageHeight,
+func getImageServiceConfig(cfg *config.Config) imagesservice.ImagesServiceConfig {
+	return imagesservice.ImagesServiceConfig{
+		ImageWidth:                   cfg.ImageProcessingService.ProfilePictureWidth,
+		ImageHeight:                  cfg.ImageProcessingService.ProfilePictureHeight,
+		BaseProfilePictureUrl:        cfg.ImageStorageService.BaseProfilePictureUrl,
+		ProfilePictureCategory:       cfg.ImageStorageService.ProfilePictureCategory,
+		AllowedTypes:                 cfg.ImageProcessingService.AllowedTypes,
+		MaxImageWidth:                cfg.ImageProcessingService.MaxImageWidth,
+		MaxImageHeight:               cfg.ImageProcessingService.MaxImageHeight,
+		MinImageWidth:                cfg.ImageProcessingService.MinImageWidth,
+		MinImageHeight:               cfg.ImageProcessingService.MinImageHeight,
+		ImageResizeMethod:            cfg.ImageProcessingService.ImageResizeMethod,
+		CheckProfilePictureExistance: cfg.ImageStorageService.CheckProfilePictureExistance,
 	}
 }
 
@@ -155,20 +172,10 @@ func getListenServerConfig(cfg *config.Config) server.Config {
 	}
 }
 
-func ConvertResizeType(resizeType string) image_processing_service.ResampleFilter {
-	resizeType = strings.ToTitle(resizeType)
-	switch resizeType {
-	case "Box":
-		return image_processing_service.ResampleFilter_Box
-	case "CatmullRom":
-		return image_processing_service.ResampleFilter_CatmullRom
-	case "Lanczos":
-		return image_processing_service.ResampleFilter_Lanczos
-	case "Linear":
-		return image_processing_service.ResampleFilter_Linear
-	case "MitchellNetravali":
-		return image_processing_service.ResampleFilter_MitchellNetravali
-	default:
-		return image_processing_service.ResampleFilter_NearestNeighbor
+func getKafkaReaderConfig(cfg config.KafkaReaderConfig) events.KafkaReaderConfig {
+	return events.KafkaReaderConfig{
+		Brokers:          cfg.Brokers,
+		GroupID:          cfg.GroupID,
+		ReadBatchTimeout: cfg.ReadBatchTimeout,
 	}
 }

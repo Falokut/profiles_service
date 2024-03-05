@@ -49,7 +49,7 @@ if supported values is empty, then any type values are supported
 | secure_config   |  image_storage_service    |  |  nested yml configuration [secure connection config](#secure-connection-config)||  |
 |base_profile_picture_url|image_storage_service|BASE_PROFILE_PICTURE_URL|string|url for getting a profile picture||
 |profile_picture_category|image_storage_service|PROFILE_PICTURE_CATEGORY|string|category on storage for profiles picture||
-|check_profile_picture_existance|image_storage_service|CHECK_PROFILE_PICTURE_EXISTANCE|bool|check profile picture existance before sending profile picture url or not||
+|check_profile_picture_existance|image_storage_service|CHECK_PROFILE_PICTURE_EXISTENCE|bool|check profile picture existence before sending profile picture url or not||
 |addr|image_processing_service|IMAGE_PROCESSING_ADDRESS|string|category on storage for profiles picture||
 | secure_config   |  image_processing_service    |  |  nested yml configuration [secure connection config](#secure-connection-config)|| |
 |resize_type|image_processing_service|RESIZE_TYPE|string|resizing method for profile picture|Box,CatmullRom,Lanczos,Linear,MitchellNetravali,NearestNeighbor|
@@ -97,13 +97,11 @@ A Duration value can be expressed in various formats, such as in seconds, minute
 - 100µs represents a duration of 100 microseconds.
 - 10ns represents a duration of 10 nanoseconds.
 
-# Secure connection config
+### Secure connection config
 |yml name| param type| description | supported values |
 |-|-|-|-|
-|dial_method|string|dial method|INSECURE,NIL_TLS_CONFIG,CLIENT_WITH_SYSTEM_CERT_POOL,SERVER|
+|dial_method|string|dial method|INSECURE,INSECURE_SKIP_VERIFY,CLIENT_WITH_SYSTEM_CERT_POOL|
 |server_name|string|server name overriding, used when dial_method=CLIENT_WITH_SYSTEM_CERT_POOL||
-|cert_name|string|certificate file name, used when dial_method=SERVER||
-|key_name|string|key file name, used when dial_method=SERVER||
 
 ### Kafka reader config
 |yml name| env name|param type| description | supported values |

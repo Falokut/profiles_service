@@ -55,7 +55,7 @@ func main() {
 	shutdown := make(chan error, 1)
 	go func() {
 		logger.Info("Metrics server running")
-		if err := metrics.RunMetricServer(cfg.PrometheusConfig.ServerConfig); err != nil {
+		if err = metrics.RunMetricServer(cfg.PrometheusConfig.ServerConfig); err != nil {
 			logger.Errorf("Shutting down, error while running metrics server %v", err)
 			shutdown <- err
 			return
@@ -63,7 +63,7 @@ func main() {
 	}()
 
 	logger.Info("Database initializing")
-	database, err := postgresrepository.NewPostgreDB(cfg.DBConfig)
+	database, err := postgresrepository.NewPostgreDB(&cfg.DBConfig)
 	if err != nil {
 		logger.Errorf("Shutting down, connection to the database is not established: %s", err.Error())
 		return
@@ -77,7 +77,7 @@ func main() {
 		logger.Info("Healthcheck initializing")
 		healthcheckManager := healthcheck.NewHealthManager(logger.Logger,
 			[]healthcheck.HealthcheckResource{database}, cfg.HealthcheckPort, nil)
-		if err := healthcheckManager.RunHealthcheckEndpoint(); err != nil {
+		if err = healthcheckManager.RunHealthcheckEndpoint(); err != nil {
 			logger.Errorf("Shutting down, error while running healthcheck endpoint %s", err.Error())
 			shutdown <- err
 			return
@@ -109,14 +109,14 @@ func main() {
 	}()
 
 	logger.Info("Service initializing")
-	service := service.NewProfilesService(repo, logger.Logger, imagesService)
+	s := service.NewProfilesService(repo, logger.Logger, imagesService)
 
-	handler := handler.NewProfilesServiceHandler(service)
+	h := handler.NewProfilesServiceHandler(s)
 
 	logger.Info("Server initializing")
-	s := server.NewServer(logger.Logger, handler)
+	serv := server.NewServer(logger.Logger, h)
 	go func() {
-		if err := s.Run(getListenServerConfig(cfg), metric, nil, nil); err != nil {
+		if err := serv.Run(getListenServerConfig(cfg), metric, nil, nil); err != nil {
 			logger.Errorf("Shutting down, error while running server %s", err.Error())
 			shutdown <- err
 			return
@@ -133,16 +133,16 @@ func main() {
 		break
 	}
 
-	s.Shutdown()
+	serv.Shutdown()
 	cancel()
 	wg.Wait()
 }
 
-func getImageServiceConfig(cfg *config.Config) imagesservice.ImagesServiceConfig {
-	return imagesservice.ImagesServiceConfig{
+func getImageServiceConfig(cfg *config.Config) *imagesservice.ImagesServiceConfig {
+	return &imagesservice.ImagesServiceConfig{
 		ImageWidth:                   cfg.ImageProcessingService.ProfilePictureWidth,
 		ImageHeight:                  cfg.ImageProcessingService.ProfilePictureHeight,
-		BaseProfilePictureUrl:        cfg.ImageStorageService.BaseProfilePictureUrl,
+		BaseProfilePictureURL:        cfg.ImageStorageService.BaseProfilePictureURL,
 		ProfilePictureCategory:       cfg.ImageStorageService.ProfilePictureCategory,
 		AllowedTypes:                 cfg.ImageProcessingService.AllowedTypes,
 		MaxImageWidth:                cfg.ImageProcessingService.MaxImageWidth,
@@ -161,7 +161,7 @@ func getListenServerConfig(cfg *config.Config) server.Config {
 		Port:           cfg.Listen.Port,
 		AllowedHeaders: cfg.Listen.AllowedHeaders,
 		ServiceDesc:    &profiles_service.ProfilesServiceV1_ServiceDesc,
-		RegisterRestHandlerServer: func(ctx context.Context, mux *runtime.ServeMux, service any) error {
+		RegisterRestHandlerServer: func(_ context.Context, mux *runtime.ServeMux, service any) error {
 			serv, ok := service.(profiles_service.ProfilesServiceV1Server)
 			if !ok {
 				return errors.New("can't convert")

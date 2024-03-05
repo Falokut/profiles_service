@@ -29,14 +29,14 @@ prometheus:
 image_storage_service:
   addr: "falokut.ru:443"
   secure_config:
-    dial_method: NIL_TLS_CONFIG
+    dial_method: INSECURE_SKIP_VERIFY
   base_profile_picture_url: "https://falokut.ru/image"
   profile_picture_category: "profiles-pictures"
 
 image_processing_service:
   addr: "falokut.ru:443"
   secure_config:
-    dial_method: NIL_TLS_CONFIG
+    dial_method: INSECURE_SKIP_VERIFY
   max_image_width: 800
   max_image_height: 800
   min_image_width: 200
@@ -45,7 +45,7 @@ image_processing_service:
   profile_picture_height: 400
   image_resize_method: Linear
   allowed_types: ["image/png", "image/jpeg"]
-  check_profile_picture_existance: false
+  check_profile_picture_existence: false
 
 account_events:
   brokers:

@@ -43,42 +43,47 @@ func NewAccountEventsConsumer(
 	}
 }
 
-func (c *accountsEventsConsumer) Run(ctx context.Context) {
+func (e *accountsEventsConsumer) Run(ctx context.Context) {
 	for {
 		select {
 		default:
-			c.Consume(ctx)
+			e.Consume(ctx)
 		case <-ctx.Done():
-			c.logger.Info("account events consumer shutting down")
-			c.reader.Close()
-			c.logger.Info("account events consumer shutted down")
+			e.logger.Info("account events consumer shutting down")
+			e.reader.Close()
+			e.logger.Info("account events consumer shutted down")
 			return
 		}
 	}
 }
 
-func (e *accountsEventsConsumer) Shutdown() error {
-	return e.reader.Close()
+func (e *accountsEventsConsumer) Shutdown() {
+	e.logger.Info("Shutting down accounts events counsumer")
+	err := e.reader.Close()
+	if err != nil {
+		e.logger.Errorf("Error occurred while shutting down accounts events counsumer")
+	}
 }
 
-func (e *accountsEventsConsumer) AccountCreated(ctx context.Context, account models.Account) (err error) {
+func (e *accountsEventsConsumer) AccountCreated(ctx context.Context, account models.AccountCreatedDTO) (err error) {
 	defer e.handleError(ctx, &err)
 	defer e.logError(err, "AccountCreated")
 
-	err = e.repo.CreateProfile(ctx, models.Profile{
-		AccountId:        account.Id,
+	err = e.repo.CreateProfile(ctx, &models.Profile{
+		AccountID:        account.ID,
 		Email:            account.Email,
 		RegistrationDate: account.RegistrationDate,
+		Username:         account.Username,
 	})
 
 	return
 }
 
-func (e *accountsEventsConsumer) AccountDeleted(ctx context.Context, email, accountId string) (err error) {
+func (e *accountsEventsConsumer) AccountDeleted(ctx context.Context, _, accountID string) (err error) {
 	defer e.handleError(ctx, &err)
 	defer e.logError(err, "AccountDeleted")
 
-	pictureId, err := e.repo.GetProfilePictureId(ctx, accountId)
+	pictureID, err := e.repo.GetProfilePictureID(ctx, accountID)
 	if models.Code(err) == models.NotFound {
 		// account already deleted
 		return nil
@@ -88,18 +93,18 @@ func (e *accountsEventsConsumer) AccountDeleted(ctx context.Context, email, acco
 		return
 	}
 
-	tx, err := e.repo.DeleteProfile(ctx, accountId)
+	tx, err := e.repo.DeleteProfile(ctx, accountID)
 	if err != nil {
 		return
 	}
 
-	err = e.imagesService.DeleteImage(ctx, pictureId)
+	err = e.imagesService.DeleteImage(ctx, pictureID)
 	if err != nil {
-		tx.Rollback()
+		err = tx.Rollback()
 		return
 	}
 
-	tx.Commit()
+	err = tx.Commit()
 	return
 }
 
@@ -150,44 +155,44 @@ func (e *accountsEventsConsumer) logError(err error, functionName string) {
 	}
 }
 
-func (c *accountsEventsConsumer) Consume(ctx context.Context) {
+func (e *accountsEventsConsumer) Consume(ctx context.Context) {
 	var err error
-	defer c.handleError(ctx, &err)
+	defer e.handleError(ctx, &err)
 
-	message, err := c.reader.FetchMessage(ctx)
+	message, err := e.reader.FetchMessage(ctx)
 	if err != nil {
 		return
 	}
 
 	switch message.Topic {
 	case accountCreatedTopic:
-		var account models.Account
+		var account models.AccountCreatedDTO
 		err = json.Unmarshal(message.Value, &account)
 		if err != nil {
 			// skip messages with invalid structure
-			err = c.reader.CommitMessages(ctx, message)
+			err = e.reader.CommitMessages(ctx, message)
 			return
 		}
 
-		err = c.AccountCreated(ctx, account)
+		err = e.AccountCreated(ctx, account)
 	case accountDeletedTopic:
 		var deletedAccount struct {
 			Email     string `json:"email"`
-			AccountId string `json:"account_id"`
+			AccountID string `json:"account_id"`
 		}
 
 		err = json.Unmarshal(message.Value, &deletedAccount)
 		if err != nil {
 			// skip messages with invalid structure
-			err = c.reader.CommitMessages(ctx, message)
+			err = e.reader.CommitMessages(ctx, message)
 			return
 		}
-		err = c.AccountDeleted(ctx, deletedAccount.Email, deletedAccount.AccountId)
+		err = e.AccountDeleted(ctx, deletedAccount.Email, deletedAccount.AccountID)
 	}
 
 	if err != nil {
 		return
 	}
 
-	err = c.reader.CommitMessages(ctx, message)
+	err = e.reader.CommitMessages(ctx, message)
 }

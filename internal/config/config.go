@@ -3,6 +3,7 @@ package config
 import (
 	"crypto/tls"
 	"crypto/x509"
+	"errors"
 	"sync"
 	"time"
 
@@ -41,9 +42,9 @@ type Config struct {
 	ImageStorageService struct {
 		Addr                         string                 `yaml:"addr" env:"IMAGE_STORAGE_ADDRESS"`
 		SecureConfig                 ConnectionSecureConfig `yaml:"secure_config"`
-		BaseProfilePictureUrl        string                 `yaml:"base_profile_picture_url" env:"BASE_PROFILE_PICTURE_URL"`
+		BaseProfilePictureURL        string                 `yaml:"base_profile_picture_url" env:"BASE_PROFILE_PICTURE_URL"`
 		ProfilePictureCategory       string                 `yaml:"profile_picture_category" env:"PROFILE_PICTURE_CATEGORY"`
-		CheckProfilePictureExistance bool                   `yaml:"check_profile_picture_existance" env:"CHECK_PROFILE_PICTURE_EXISTANCE"`
+		CheckProfilePictureExistance bool                   `yaml:"check_profile_picture_existence" env:"CHECK_PROFILE_PICTURE_EXISTENCE"`
 	} `yaml:"image_storage_service"`
 	ImageProcessingService struct {
 		Addr                 string                 `yaml:"addr" env:"IMAGE_PROCESSING_ADDRESS"`
@@ -84,9 +85,8 @@ type DialMethod = string
 
 const (
 	Insecure                 DialMethod = "INSECURE"
-	NilTlsConfig             DialMethod = "NIL_TLS_CONFIG"
+	InsecureSkipVerify       DialMethod = "INSECURE_SKIP_VERIFY"
 	ClientWithSystemCertPool DialMethod = "CLIENT_WITH_SYSTEM_CERT_POOL"
-	Server                   DialMethod = "SERVER"
 )
 
 type ConnectionSecureConfig struct {
@@ -102,8 +102,8 @@ func (c ConnectionSecureConfig) GetGrpcTransportCredentials() (grpc.DialOption, 
 		return grpc.WithTransportCredentials(insecure.NewCredentials()), nil
 	}
 
-	if c.Method == NilTlsConfig {
-		return grpc.WithTransportCredentials(credentials.NewTLS(nil)), nil
+	if c.Method == InsecureSkipVerify {
+		return grpc.WithTransportCredentials(credentials.NewTLS(&tls.Config{InsecureSkipVerify: true})), nil
 	}
 
 	if c.Method == ClientWithSystemCertPool {
@@ -114,9 +114,5 @@ func (c ConnectionSecureConfig) GetGrpcTransportCredentials() (grpc.DialOption, 
 		return grpc.WithTransportCredentials(credentials.NewClientTLSFromCert(certPool, c.ServerName)), nil
 	}
 
-	cert, err := tls.LoadX509KeyPair(c.CertName, c.KeyName)
-	if err != nil {
-		return grpc.EmptyDialOption{}, err
-	}
-	return grpc.WithTransportCredentials(credentials.NewServerTLSFromCert(&cert)), nil
+	return nil, errors.ErrUnsupported
 }

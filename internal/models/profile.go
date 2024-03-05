@@ -5,17 +5,17 @@ import (
 )
 
 type Profile struct {
-	AccountId         string    `db:"account_id"`
-	Username          string    `db:"username"`
-	Email             string    `db:"email"`
-	ProfilePictureUrl string    `db:"profile_picture_id"`
-	RegistrationDate  time.Time `db:"registration_date"`
+	AccountID         string
+	Username          string
+	Email             string
+	ProfilePictureURL string
+	RegistrationDate  time.Time
 }
 
 type RepositoryProfile struct {
-	AccountId        string    `db:"account_id"`
+	AccountID        string    `db:"account_id"`
 	Username         string    `db:"username"`
 	Email            string    `db:"email"`
-	ProfilePictureId string    `db:"profile_picture_id"`
+	ProfilePictureID string    `db:"profile_picture_id"`
 	RegistrationDate time.Time `db:"registration_date"`
 }

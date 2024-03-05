@@ -10,8 +10,8 @@ import (
 
 type ProfilesRepository interface {
 	DeleteProfile(ctx context.Context, id string) (tx repository.Transaction, err error)
-	GetProfilePictureId(ctx context.Context, accountId string) (string, error)
-	CreateProfile(ctx context.Context, profile models.Profile) error
+	GetProfilePictureID(ctx context.Context, accountID string) (string, error)
+	CreateProfile(ctx context.Context, profile *models.Profile) error
 }
 
 type KafkaReaderConfig struct {
@@ -21,5 +21,5 @@ type KafkaReaderConfig struct {
 }
 
 type ImagesService interface {
-	DeleteImage(ctx context.Context, pictureId string) error
+	DeleteImage(ctx context.Context, pictureID string) error
 }

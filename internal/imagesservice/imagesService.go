@@ -24,7 +24,7 @@ type ImagesServiceConfig struct {
 	ImageHeight       int32
 	ImageResizeMethod string
 
-	BaseProfilePictureUrl  string
+	BaseProfilePictureURL  string
 	ProfilePictureCategory string
 
 	AllowedTypes   []string
@@ -46,11 +46,10 @@ type ImagesService struct {
 	imageProcessingServiceConn *grpc.ClientConn
 }
 
-func NewImagesService(cfg ImagesServiceConfig,
+func NewImagesService(cfg *ImagesServiceConfig,
 	logger *logrus.Logger,
 	imagesStorageAddr string, imageStorageSecureConfig config.ConnectionSecureConfig,
 	imageProcessingAddr string, imageProcessingSecureConfig config.ConnectionSecureConfig) (*ImagesService, error) {
-
 	imagesStorageServiceConn, err := getGrpcConn(imagesStorageAddr, imageStorageSecureConfig)
 	if err != nil {
 		return nil, err
@@ -63,7 +62,7 @@ func NewImagesService(cfg ImagesServiceConfig,
 	}
 
 	return &ImagesService{
-		cfg:                        cfg,
+		cfg:                        *cfg,
 		logger:                     logger,
 		imagesStorageServiceConn:   imagesStorageServiceConn,
 		imageProcessingServiceConn: imageProcessingServiceConn,
@@ -104,8 +103,8 @@ func getGrpcConn(addr string, secureConf config.ConnectionSecureConfig) (*grpc.C
 
 // Returns profile picture url for GET request, or
 // returns empty string if there are error or picture unreachable
-func (s *ImagesService) GetProfilePictureUrl(ctx context.Context, pictureId string) string {
-	if pictureId == "" {
+func (s *ImagesService) GetProfilePictureURL(ctx context.Context, pictureID string) string {
+	if pictureID == "" {
 		return ""
 	}
 
@@ -113,9 +112,9 @@ func (s *ImagesService) GetProfilePictureUrl(ctx context.Context, pictureId stri
 		res, err := s.imagesStorageService.IsImageExist(ctx,
 			&image_storage_service.ImageRequest{
 				Category: s.cfg.ProfilePictureCategory,
-				ImageId:  pictureId})
+				ImageId:  pictureID})
 		if err != nil {
-			s.handleError(ctx, &err, "GetProfilePictureUrl")
+			s.handleError(ctx, &err, "GetProfilePictureURL")
 			return ""
 		}
 		if !res.ImageExist {
@@ -123,7 +122,7 @@ func (s *ImagesService) GetProfilePictureUrl(ctx context.Context, pictureId stri
 		}
 	}
 
-	return fmt.Sprintf("%s/%s/%s", s.cfg.BaseProfilePictureUrl, s.cfg.ProfilePictureCategory, pictureId)
+	return fmt.Sprintf("%s/%s/%s", s.cfg.BaseProfilePictureURL, s.cfg.ProfilePictureCategory, pictureID)
 }
 
 // returns error if image not valid
@@ -145,9 +144,7 @@ func (s *ImagesService) checkImage(ctx context.Context, image []byte) (err error
 			s.handleError(ctx, &err, "checkImage")
 		}
 		return
-
 	}
-
 	return nil
 }
 
@@ -172,7 +169,7 @@ func (s *ImagesService) ResizeImage(ctx context.Context, image []byte) (resizedI
 	return resized.Data, nil
 }
 
-func (s *ImagesService) UploadImage(ctx context.Context, image []byte) (imageId string, err error) {
+func (s *ImagesService) UploadImage(ctx context.Context, image []byte) (imageID string, err error) {
 	defer s.handleError(ctx, &err, "UploadImage")
 	if err = s.checkImage(ctx, image); err != nil {
 		return
@@ -233,7 +230,7 @@ func (s *ImagesService) DeleteImage(ctx context.Context, pictureID string) (err 
 }
 
 func (s *ImagesService) ReplaceImage(ctx context.Context, image []byte,
-	pictureID string, createIfNotExist bool) (newPictureId string, err error) {
+	pictureID string, createIfNotExist bool) (newPictureID string, err error) {
 	defer s.handleError(ctx, &err, "ReplaceImage")
 
 	if err = s.checkImage(ctx, image); err != nil {
@@ -291,7 +288,6 @@ func (s *ImagesService) handleError(ctx context.Context, err *error, functionNam
 	default:
 		*err = models.Error(models.Unknown, e.Error())
 	}
-
 }
 
 func (s *ImagesService) logError(err error, functionName string) {

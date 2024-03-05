@@ -12,13 +12,12 @@ type Transaction interface {
 }
 
 type ProfileRepository interface {
-	CreateProfile(ctx context.Context, profile models.Profile) error
-	DeleteProfile(ctx context.Context, accountId string) (tx Transaction, err error)
-	// in
-	GetProfile(ctx context.Context, accountId string) (models.RepositoryProfile, error)
-	GetProfilePictureId(ctx context.Context, accountId string) (string, error)
-	UpdateProfilePictureId(ctx context.Context, accountId string, pictureId string) error
-	GetEmail(ctx context.Context, accountId string) (string, error)
+	CreateProfile(ctx context.Context, profile *models.Profile) error
+	DeleteProfile(ctx context.Context, accountID string) (tx Transaction, err error)
+	GetProfile(ctx context.Context, accountID string) (models.RepositoryProfile, error)
+	GetProfilePictureID(ctx context.Context, accountID string) (string, error)
+	UpdateProfilePictureID(ctx context.Context, accountID string, pictureID string) error
+	GetEmail(ctx context.Context, accountID string) (string, error)
 }
 
 type DBConfig struct {

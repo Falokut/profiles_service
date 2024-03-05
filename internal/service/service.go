@@ -9,7 +9,7 @@ import (
 )
 
 type ImagesService interface {
-	GetProfilePictureUrl(ctx context.Context, pictureID string) string
+	GetProfilePictureURL(ctx context.Context, pictureID string) string
 	ResizeImage(ctx context.Context, image []byte) ([]byte, error)
 	UploadImage(ctx context.Context, image []byte) (string, error)
 	DeleteImage(ctx context.Context, pictureID string) error
@@ -17,10 +17,10 @@ type ImagesService interface {
 }
 
 type ProfilesService interface {
-	GetProfile(ctx context.Context, accountId string) (models.Profile, error)
-	UpdateProfilePicture(ctx context.Context, accountId string, image []byte) error
-	GetEmail(ctx context.Context, accountId string) (string, error)
-	DeleteProfilePicture(ctx context.Context, accountId string) error
+	GetProfile(ctx context.Context, accountID string) (models.Profile, error)
+	UpdateProfilePicture(ctx context.Context, accountID string, image []byte) error
+	GetEmail(ctx context.Context, accountID string) (string, error)
+	DeleteProfilePicture(ctx context.Context, accountID string) error
 }
 
 type profilesService struct {
@@ -38,33 +38,33 @@ func NewProfilesService(repo repository.ProfileRepository,
 }
 
 func (s *profilesService) GetProfile(ctx context.Context,
-	accountId string) (profile models.Profile, err error) {
-	repoProfile, err := s.repo.GetProfile(ctx, accountId)
+	accountID string) (profile models.Profile, err error) {
+	repoProfile, err := s.repo.GetProfile(ctx, accountID)
 
 	if err != nil {
 		return
 	}
 
 	profile = models.Profile{
-		AccountId:         repoProfile.AccountId,
+		AccountID:         repoProfile.AccountID,
 		Email:             repoProfile.Email,
 		Username:          repoProfile.Username,
 		RegistrationDate:  repoProfile.RegistrationDate,
-		ProfilePictureUrl: s.imagesService.GetProfilePictureUrl(ctx, repoProfile.ProfilePictureId),
+		ProfilePictureURL: s.imagesService.GetProfilePictureURL(ctx, repoProfile.ProfilePictureID),
 	}
 	return
 }
 
 func (s *profilesService) UpdateProfilePicture(ctx context.Context,
-	accountId string, image []byte) (err error) {
+	accountID string, image []byte) (err error) {
 	s.logger.Info("Getting current picture id")
-	currentPictureID, err := s.repo.GetProfilePictureId(ctx, accountId)
+	currentPictureID, err := s.repo.GetProfilePictureID(ctx, accountID)
 	if err != nil {
 		return
 	}
 
 	var pictureID string
-	if len(currentPictureID) == 0 {
+	if currentPictureID == "" {
 		s.logger.Info("Uploading image")
 		pictureID, err = s.imagesService.UploadImage(ctx, image)
 	} else {
@@ -78,7 +78,7 @@ func (s *profilesService) UpdateProfilePicture(ctx context.Context,
 
 	if pictureID != currentPictureID {
 		s.logger.Info("Updating PictureID")
-		err = s.repo.UpdateProfilePictureId(ctx, accountId, pictureID)
+		err = s.repo.UpdateProfilePictureID(ctx, accountID, pictureID)
 		if err != nil {
 			return
 		}
@@ -92,17 +92,17 @@ func (s *profilesService) GetEmail(ctx context.Context, accountID string) (email
 	return
 }
 
-func (s *profilesService) DeleteProfilePicture(ctx context.Context, accountId string) (err error) {
-	currentPictureId, err := s.repo.GetProfilePictureId(ctx, accountId)
-	if err != nil || currentPictureId == "" {
+func (s *profilesService) DeleteProfilePicture(ctx context.Context, accountID string) (err error) {
+	currentPictureID, err := s.repo.GetProfilePictureID(ctx, accountID)
+	if err != nil || currentPictureID == "" {
 		return
 	}
 
-	err = s.imagesService.DeleteImage(ctx, currentPictureId)
+	err = s.imagesService.DeleteImage(ctx, currentPictureID)
 	if err != nil {
 		return
 	}
 
-	err = s.repo.UpdateProfilePictureId(ctx, accountId, "")
+	err = s.repo.UpdateProfilePictureID(ctx, accountID, "")
 	return
 }

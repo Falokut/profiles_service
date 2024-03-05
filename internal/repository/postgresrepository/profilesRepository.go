@@ -13,7 +13,7 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-func NewPostgreDB(cfg repository.DBConfig) (*sqlx.DB, error) {
+func NewPostgreDB(cfg *repository.DBConfig) (*sqlx.DB, error) {
 	conStr := fmt.Sprintf("host=%s port=%s user=%s password=%s dbname=%s sslmode=%s",
 		cfg.Host, cfg.Port, cfg.Username, cfg.Password, cfg.DBName, cfg.SSLMode)
 	db, err := sqlx.Connect("pgx", conStr)
@@ -38,59 +38,59 @@ func NewProfilesRepository(db *sqlx.DB, logger *logrus.Logger) *ProfilesReposito
 	return &ProfilesRepository{db: db, logger: logger}
 }
 
-func (r *ProfilesRepository) GetProfile(ctx context.Context, accountId string) (profile models.RepositoryProfile, err error) {
+func (r *ProfilesRepository) GetProfile(ctx context.Context, accountID string) (profile models.RepositoryProfile, err error) {
 	defer r.handleError(ctx, &err, "GetProfile")
 
 	query := fmt.Sprintf(`SELECT username, email, COALESCE(profile_picture_id,'') AS profile_picture_id,registration_date
 	 FROM %s WHERE account_id=$1 LIMIT 1;`,
 		profilesTableName)
 
-	err = r.db.GetContext(ctx, &profile, query, accountId)
+	err = r.db.GetContext(ctx, &profile, query, accountID)
 	return
 }
 
-func (r *ProfilesRepository) UpdateProfilePictureId(ctx context.Context, accountId string, pictureId string) (err error) {
-	defer r.handleError(ctx, &err, "UpdateProfilePictureId")
+func (r *ProfilesRepository) UpdateProfilePictureID(ctx context.Context, accountID, pictureID string) (err error) {
+	defer r.handleError(ctx, &err, "UpdateProfilePictureID")
 
 	query := fmt.Sprintf("UPDATE %s SET profile_picture_id=$1 WHERE account_id=$2;",
 		profilesTableName)
 
-	_, err = r.db.ExecContext(ctx, query, pictureId, accountId)
+	_, err = r.db.ExecContext(ctx, query, pictureID, accountID)
 	return err
 }
 
-func (r *ProfilesRepository) GetProfilePictureId(ctx context.Context, accountId string) (pictureId string, err error) {
-	defer r.handleError(ctx, &err, "GetProfilePictureId")
+func (r *ProfilesRepository) GetProfilePictureID(ctx context.Context, accountID string) (pictureID string, err error) {
+	defer r.handleError(ctx, &err, "GetProfilePictureID")
 
 	query := fmt.Sprintf("SELECT COALESCE(profile_picture_id,'')  AS profile_picture_id FROM %s WHERE account_id=$1 LIMIT 1;",
 		profilesTableName)
 
-	err = r.db.GetContext(ctx, &pictureId, query, accountId)
+	err = r.db.GetContext(ctx, &pictureID, query, accountID)
 
 	return
 }
 
-func (r *ProfilesRepository) GetEmail(ctx context.Context, accountId string) (email string, err error) {
+func (r *ProfilesRepository) GetEmail(ctx context.Context, accountID string) (email string, err error) {
 	defer r.handleError(ctx, &err, "GetEmail")
 	query := fmt.Sprintf("SELECT email FROM %s WHERE account_id=$1 LIMIT 1;",
 		profilesTableName)
 
-	err = r.db.GetContext(ctx, &email, query, accountId)
+	err = r.db.GetContext(ctx, &email, query, accountID)
 	return
 }
 
-func (r *ProfilesRepository) CreateProfile(ctx context.Context, profile models.Profile) (err error) {
+func (r *ProfilesRepository) CreateProfile(ctx context.Context, profile *models.Profile) (err error) {
 	defer r.handleError(ctx, &err, "CreateProfile")
 
 	query := fmt.Sprintf("INSERT INTO %s (account_id, email, username, registration_date) VALUES ($1, $2, $3, $4)",
 		profilesTableName)
 
-	_, err = r.db.QueryContext(ctx, query, profile.AccountId, profile.Email, profile.Username, profile.RegistrationDate)
+	_, err = r.db.ExecContext(ctx, query, profile.AccountID, profile.Email, profile.Username, profile.RegistrationDate)
 	return
 }
 
-func (r *ProfilesRepository) DeleteProfile(ctx context.Context, accountId string) (restx repository.Transaction, err error) {
-	defer r.handleError(ctx, &err, "CreateProfile")
+func (r *ProfilesRepository) DeleteProfile(ctx context.Context, accountID string) (restx repository.Transaction, err error) {
+	defer r.handleError(ctx, &err, "DeleteProfile")
 
 	tx, err := r.db.BeginTx(ctx, &sql.TxOptions{})
 	if err != nil {
@@ -98,9 +98,9 @@ func (r *ProfilesRepository) DeleteProfile(ctx context.Context, accountId string
 	}
 
 	query := fmt.Sprintf("DELETE FROM %s WHERE account_id=$1", profilesTableName)
-	_, err = tx.ExecContext(ctx, query, accountId)
+	_, err = tx.ExecContext(ctx, query, accountID)
 	if err != nil {
-		tx.Rollback()
+		err = tx.Rollback()
 		return
 	}
 
@@ -137,7 +137,6 @@ func (r *ProfilesRepository) handleError(ctx context.Context, err *error, functi
 			code = models.Internal
 			*err = models.Error(code, "repository internal error")
 		}
-
 	}
 }
 

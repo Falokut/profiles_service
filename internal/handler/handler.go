@@ -15,24 +15,24 @@ import (
 )
 
 type ProfileServiceHandler struct {
-	service service.ProfilesService
+	s service.ProfilesService
 	profiles_service.UnimplementedProfilesServiceV1Server
 }
 
-func NewProfilesServiceHandler(service service.ProfilesService) *ProfileServiceHandler {
-	return &ProfileServiceHandler{service: service}
+func NewProfilesServiceHandler(s service.ProfilesService) *ProfileServiceHandler {
+	return &ProfileServiceHandler{s: s}
 }
 
 func (h *ProfileServiceHandler) GetProfile(ctx context.Context,
-	in *emptypb.Empty) (res *profiles_service.GetProfileResponse, err error) {
+	_ *emptypb.Empty) (res *profiles_service.GetProfileResponse, err error) {
 	defer h.handleError(&err)
 
-	accountId, err := getAccountId(ctx)
+	accountID, err := getAccountID(ctx)
 	if err != nil {
 		return
 	}
 
-	profile, err := h.service.GetProfile(ctx, accountId)
+	profile, err := h.s.GetProfile(ctx, accountID)
 	if err != nil {
 		return
 	}
@@ -40,7 +40,7 @@ func (h *ProfileServiceHandler) GetProfile(ctx context.Context,
 	return &profiles_service.GetProfileResponse{
 		Username:          profile.Username,
 		Email:             profile.Email,
-		ProfilePictureURL: profile.ProfilePictureUrl,
+		ProfilePictureURL: profile.ProfilePictureURL,
 		RegistrationDate:  timestamppb.New(profile.RegistrationDate),
 	}, nil
 }
@@ -49,12 +49,12 @@ func (h *ProfileServiceHandler) UpdateProfilePicture(ctx context.Context,
 	in *profiles_service.UpdateProfilePictureRequest) (res *emptypb.Empty, err error) {
 	defer h.handleError(&err)
 
-	accountId, err := getAccountId(ctx)
+	accountID, err := getAccountID(ctx)
 	if err != nil {
 		return
 	}
 
-	err = h.service.UpdateProfilePicture(ctx, accountId, in.Image)
+	err = h.s.UpdateProfilePicture(ctx, accountID, in.Image)
 	if err != nil {
 		return
 	}
@@ -62,14 +62,14 @@ func (h *ProfileServiceHandler) UpdateProfilePicture(ctx context.Context,
 	return &emptypb.Empty{}, nil
 }
 
-func (h *ProfileServiceHandler) GetEmail(ctx context.Context, in *emptypb.Empty) (res *profiles_service.GetEmailResponse, err error) {
+func (h *ProfileServiceHandler) GetEmail(ctx context.Context, _ *emptypb.Empty) (res *profiles_service.GetEmailResponse, err error) {
 	defer h.handleError(&err)
 
-	accountId, err := getAccountId(ctx)
+	accountID, err := getAccountID(ctx)
 	if err != nil {
 		return
 	}
-	email, err := h.service.GetEmail(ctx, accountId)
+	email, err := h.s.GetEmail(ctx, accountID)
 	if err != nil {
 		return
 	}
@@ -77,15 +77,15 @@ func (h *ProfileServiceHandler) GetEmail(ctx context.Context, in *emptypb.Empty)
 	return &profiles_service.GetEmailResponse{Email: email}, nil
 }
 
-func (h *ProfileServiceHandler) DeleteProfilePicture(ctx context.Context, in *emptypb.Empty) (res *emptypb.Empty, err error) {
+func (h *ProfileServiceHandler) DeleteProfilePicture(ctx context.Context, _ *emptypb.Empty) (res *emptypb.Empty, err error) {
 	defer h.handleError(&err)
 
-	accountId, err := getAccountId(ctx)
+	accountID, err := getAccountID(ctx)
 	if err != nil {
 		return
 	}
 
-	err = h.service.DeleteProfilePicture(ctx, accountId)
+	err = h.s.DeleteProfilePicture(ctx, accountID)
 	if err != nil {
 		return
 	}
@@ -94,21 +94,21 @@ func (h *ProfileServiceHandler) DeleteProfilePicture(ctx context.Context, in *em
 }
 
 const (
-	AccountIdContext = "X-Account-Id"
+	AccountIDContext = "X-Account-Id"
 )
 
-func getAccountId(ctx context.Context) (string, error) {
+func getAccountID(ctx context.Context) (string, error) {
 	md, ok := metadata.FromIncomingContext(ctx)
 	if !ok {
 		return "", status.Error(codes.Unauthenticated, "no context metadata provided")
 	}
 
-	accountId := md.Get(AccountIdContext)
-	if len(accountId) == 0 || accountId[0] == "" {
+	accountID := md.Get(AccountIDContext)
+	if len(accountID) == 0 || accountID[0] == "" {
 		return "", status.Error(codes.Unauthenticated, "no account id provided")
 	}
 
-	return accountId[0], nil
+	return accountID[0], nil
 }
 
 func (h *ProfileServiceHandler) handleError(err *error) {

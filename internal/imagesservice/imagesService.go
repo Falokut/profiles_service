@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"runtime"
 	"strings"
 
 	image_processing_service "github.com/Falokut/image_processing_service/pkg/image_processing_service/v1/protos"
@@ -137,14 +136,13 @@ func (s *ImagesService) checkImage(ctx context.Context, image []byte) (err error
 		MinWidth:       &s.cfg.MinImageWidth,
 	})
 	if err != nil {
-		var msg string
-		if res != nil {
-			err = models.Error(models.InvalidArgument, msg)
-		} else {
-			s.handleError(ctx, &err, "checkImage")
-		}
+		s.handleError(ctx, &err, "checkImage")
 		return
 	}
+	if !res.ImageValid {
+		err = models.Error(models.InvalidArgument, res.GetDetails())
+	}
+
 	return nil
 }
 
@@ -184,32 +182,8 @@ func (s *ImagesService) UploadImage(ctx context.Context, image []byte) (imageID 
 
 	s.logger.Debugf("image size before resizing: %d resized: %d", imageSizeWithoutResize, len(image))
 	s.logger.Info("Creating stream")
-	stream, err := s.imagesStorageService.StreamingUploadImage(ctx)
-	if err != nil {
-		return
-	}
-
-	chunkSize := (len(image) + runtime.NumCPU() - 1) / runtime.NumCPU()
-	for i := 0; i < len(image); i += chunkSize {
-		last := i + chunkSize
-		if last > len(image) {
-			last = len(image)
-		}
-		var chunk []byte
-		chunk = append(chunk, image[i:last]...)
-
-		s.logger.Debug("Sending image chunk")
-		err = stream.Send(&image_storage_service.StreamingUploadImageRequest{
-			Category: s.cfg.ProfilePictureCategory,
-			Data:     chunk,
-		})
-		if err != nil {
-			return
-		}
-	}
-
-	s.logger.Info("Closing stream")
-	res, err := stream.CloseAndRecv()
+	res, err := s.imagesStorageService.UploadImage(ctx,
+		&image_storage_service.UploadImageRequest{Image: image})
 	if err != nil {
 		return
 	}
@@ -308,7 +282,7 @@ func (s *ImagesService) logError(err error, functionName string) {
 		s.logger.WithFields(
 			logrus.Fields{
 				"error.function.name": functionName,
-				"error.msg":           err.Error,
+				"error.msg":           err.Error(),
 			},
 		).Error("images service error occurred")
 	}

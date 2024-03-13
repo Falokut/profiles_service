@@ -76,6 +76,10 @@ func (e *accountsEventsConsumer) AccountCreated(ctx context.Context, account mod
 		Username:         account.Username,
 	})
 
+	if models.Code(err) == models.Conflict {
+		return nil
+	}
+
 	return
 }
 

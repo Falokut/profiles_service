@@ -47,8 +47,10 @@ type ImagesService struct {
 
 func NewImagesService(cfg *ImagesServiceConfig,
 	logger *logrus.Logger,
-	imagesStorageAddr string, imageStorageSecureConfig config.ConnectionSecureConfig,
-	imageProcessingAddr string, imageProcessingSecureConfig config.ConnectionSecureConfig) (*ImagesService, error) {
+	imagesStorageAddr string,
+	imageStorageSecureConfig config.ConnectionSecureConfig,
+	imageProcessingAddr string,
+	imageProcessingSecureConfig config.ConnectionSecureConfig) (*ImagesService, error) {
 	imagesStorageServiceConn, err := getGrpcConn(imagesStorageAddr, imageStorageSecureConfig)
 	if err != nil {
 		return nil, err
@@ -183,7 +185,10 @@ func (s *ImagesService) UploadImage(ctx context.Context, image []byte) (imageID 
 	s.logger.Debugf("image size before resizing: %d resized: %d", imageSizeWithoutResize, len(image))
 	s.logger.Info("Creating stream")
 	res, err := s.imagesStorageService.UploadImage(ctx,
-		&image_storage_service.UploadImageRequest{Image: image})
+		&image_storage_service.UploadImageRequest{
+			Image:    image,
+			Category: s.cfg.ProfilePictureCategory,
+		})
 	if err != nil {
 		return
 	}
@@ -191,20 +196,24 @@ func (s *ImagesService) UploadImage(ctx context.Context, image []byte) (imageID 
 	return res.ImageId, nil
 }
 
-func (s *ImagesService) DeleteImage(ctx context.Context, pictureID string) (err error) {
+func (s *ImagesService) DeleteImage(ctx context.Context, imageID string) (err error) {
 	defer s.handleError(ctx, &err, "DeleteImage")
 
-	s.logger.Debugf("Deleting image with %s id", pictureID)
+	if imageID == "" {
+		return nil
+	}
+
+	s.logger.Debugf("Deleting image with %s id", imageID)
 	_, err = s.imagesStorageService.DeleteImage(ctx, &image_storage_service.ImageRequest{
 		Category: s.cfg.ProfilePictureCategory,
-		ImageId:  pictureID,
+		ImageId:  imageID,
 	})
 
 	return
 }
 
 func (s *ImagesService) ReplaceImage(ctx context.Context, image []byte,
-	pictureID string, createIfNotExist bool) (newPictureID string, err error) {
+	imageID string, createIfNotExist bool) (newPictureID string, err error) {
 	defer s.handleError(ctx, &err, "ReplaceImage")
 
 	if err = s.checkImage(ctx, image); err != nil {
@@ -222,7 +231,7 @@ func (s *ImagesService) ReplaceImage(ctx context.Context, image []byte,
 	resp, err := s.imagesStorageService.ReplaceImage(ctx,
 		&image_storage_service.ReplaceImageRequest{
 			Category:         s.cfg.ProfilePictureCategory,
-			ImageId:          pictureID,
+			ImageId:          imageID,
 			ImageData:        image,
 			CreateIfNotExist: createIfNotExist,
 		})
